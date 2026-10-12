@@ -1,0 +1,15 @@
+{
+  "name": "mindvision",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "lint": "npm --prefix frontend run lint",
+    "start:backend": "node backend/src/server.js",
+    "dev:backend": "node --watch backend/src/server.js",
+    "dev:all": "npm run start:backend & npm --prefix frontend run dev"
+  }
+}

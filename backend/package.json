@@ -1,0 +1,21 @@
+{
+  "name": "mindvision-backend",
+  "version": "1.0.0",
+  "description": "MindVision Clinical AI - Decoupled REST & Signaling Services API",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "mindvision",
+    "clinical-ai",
+    "telemetry",
+    "healthcare",
+    "backend"
+  ],
+  "author": "MindVision AI",
+  "license": "ISC"
+}

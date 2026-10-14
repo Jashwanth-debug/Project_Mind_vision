@@ -57,31 +57,25 @@ export default function Navbar({
                 className={`nav-link-btn ${activeTab === 'home' ? 'active' : ''}`}
                 onClick={() => setActiveTab('home')}
               >
-                Overview
-              </button>
-              <button
-                className={`nav-link-btn ${activeTab === 'assessment' ? 'active' : ''}`}
-                onClick={() => setActiveTab('assessment')}
-              >
-                Check-in
+                Home
               </button>
               <button
                 className={`nav-link-btn ${activeTab === 'results' ? 'active' : ''}`}
                 onClick={() => setActiveTab('results')}
               >
-                My Results
+                My Check-ins
               </button>
               <button
                 className={`nav-link-btn ${activeTab === 'doctors' ? 'active' : ''}`}
                 onClick={() => setActiveTab('doctors')}
               >
-                Talk to a Clinician
+                Talk to Someone
               </button>
               <button
-                className={`nav-link-btn ${activeTab === 'docs' ? 'active' : ''}`}
+                className={`nav-link-btn ${activeTab === 'docs' || activeTab === 'help' ? 'active' : ''}`}
                 onClick={() => setActiveTab('docs')}
               >
-                Help &amp; FAQ
+                Help
               </button>
             </>
           )}
@@ -159,101 +153,131 @@ export default function Navbar({
           )}
         </nav>
 
-        {/* System Telemetry & Control Actions */}
+        {/* System & Navigation Actions */}
         <div className="nav-actions">
-          {/* 3-Role View Switcher */}
+          {/* Internal Role Switcher - Gated strictly for Clinician/Technical Staff */}
+          {(currentRole !== 'PATIENT') && (
+            <div style={{
+              display: 'inline-flex',
+              padding: '2px',
+              background: 'var(--bg-secondary)',
+              borderRadius: 'var(--radius-pill)',
+              border: '1px solid var(--border-color)',
+              alignItems: 'center'
+            }} title="Switch workstation perspective">
+              <button
+                type="button"
+                onClick={() => handleRoleChange('PATIENT')}
+                style={{
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'none',
+                  background: currentRole === 'PATIENT' ? 'var(--accent-teal)' : 'transparent',
+                  color: currentRole === 'PATIENT' ? '#fff' : 'var(--text-secondary)',
+                  fontWeight: 600,
+                  fontSize: '0.74rem',
+                  cursor: 'pointer'
+                }}
+              >
+                👤 Patient View
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRoleChange('DOCTOR')}
+                style={{
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'none',
+                  background: (currentRole === 'DOCTOR' || currentRole === 'CLINICIAN') ? 'var(--accent-teal)' : 'transparent',
+                  color: (currentRole === 'DOCTOR' || currentRole === 'CLINICIAN') ? '#fff' : 'var(--text-secondary)',
+                  fontWeight: 600,
+                  fontSize: '0.74rem',
+                  cursor: 'pointer'
+                }}
+              >
+                🩺 Clinician
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRoleChange('ADMIN')}
+                style={{
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'none',
+                  background: (currentRole === 'ADMIN' || currentRole === 'TECHNICAL') ? 'var(--accent-teal)' : 'transparent',
+                  color: (currentRole === 'ADMIN' || currentRole === 'TECHNICAL') ? '#fff' : 'var(--text-secondary)',
+                  fontWeight: 600,
+                  fontSize: '0.74rem',
+                  cursor: 'pointer'
+                }}
+              >
+                🔬 Technical
+              </button>
+            </div>
+          )}
+
+          {/* Simple, Non-Alarming Privacy Reassurance for Patients */}
           <div style={{
             display: 'inline-flex',
-            padding: '2px',
-            background: 'var(--bg-secondary)',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '0.35rem 0.8rem',
             borderRadius: 'var(--radius-pill)',
-            border: '1px solid var(--border-color)',
-            alignItems: 'center'
-          }} title="Switch between Patient, Clinician, and Technical research views">
-            <button
-              type="button"
-              onClick={() => handleRoleChange('PATIENT')}
-              style={{
-                padding: '0.25rem 0.65rem',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: currentRole === 'PATIENT' ? 'var(--accent-teal)' : 'transparent',
-                color: currentRole === 'PATIENT' ? '#fff' : 'var(--text-secondary)',
-                fontWeight: 600,
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              👤 Patient
-            </button>
-            <button
-              type="button"
-              onClick={() => handleRoleChange('DOCTOR')}
-              style={{
-                padding: '0.25rem 0.65rem',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: (currentRole === 'DOCTOR' || currentRole === 'CLINICIAN') ? 'var(--accent-teal)' : 'transparent',
-                color: (currentRole === 'DOCTOR' || currentRole === 'CLINICIAN') ? '#fff' : 'var(--text-secondary)',
-                fontWeight: 600,
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              🩺 Clinician
-            </button>
-            <button
-              type="button"
-              onClick={() => handleRoleChange('ADMIN')}
-              style={{
-                padding: '0.25rem 0.65rem',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: (currentRole === 'ADMIN' || currentRole === 'TECHNICAL') ? 'var(--accent-teal)' : 'transparent',
-                color: (currentRole === 'ADMIN' || currentRole === 'TECHNICAL') ? '#fff' : 'var(--text-secondary)',
-                fontWeight: 600,
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              🔬 Technical
-            </button>
+            backgroundColor: 'var(--accent-teal-soft-bg)',
+            color: 'var(--color-primary)',
+            fontSize: '0.78rem',
+            fontWeight: 600
+          }}>
+            <span>🔒</span>
+            <span>Your information is private and secure.</span>
           </div>
 
-          {/* Clinician Account / Sign-in */}
+          {/* Gentle, Calm Immediate Support Option */}
           <button
-            className="btn-account-switch"
+            type="button"
+            onClick={onEmergencyConnect}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              backgroundColor: 'var(--status-support-bg)',
+              color: 'var(--status-support-text)',
+              border: '1px solid var(--status-support-border)',
+              borderRadius: 'var(--radius-pill)',
+              padding: '0.4rem 0.95rem',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            title="Need immediate listening support or free crisis resources?"
+          >
+            <span>💬</span>
+            <span>Need help now?</span>
+          </button>
+
+          {/* Clinician Access Link (Discreetly placed, not an overwhelming toggle) */}
+          <button
+            type="button"
             onClick={onOpenAuth}
-            title="Clinician Account Details &amp; Registration"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+              padding: '0.3rem 0.5rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}
+            title="Clinician / Provider sign in"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
-            <span className="account-role-label">
-              {currentRole === 'DOCTOR' ? (doctorName || 'Dr. Account') : currentRole === 'ADMIN' ? 'Admin console' : 'Account'}
-            </span>
-          </button>
-
-          {/* On-Device Privacy Badge (Plain language) */}
-          <div className="wasm-badge" title="All voice and facial signal processing runs privately on your device. Zero audio or video leaves your browser.">
-            <span className="pulse-dot"></span>
-            <span>🔒 PRIVATE ON-DEVICE</span>
-          </div>
-
-          {/* Immediate Assistance Action Button */}
-          <button
-            className="btn-emergency-action"
-            onClick={onEmergencyConnect}
-            title="Immediate connection to an on-call mental health clinician"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-            </svg>
-            <span>Immediate Support</span>
+            <span>{currentRole === 'PATIENT' ? 'Provider login' : (doctorName || 'Staff Console')}</span>
           </button>
 
           {/* Theme Switcher */}
@@ -261,7 +285,7 @@ export default function Navbar({
             className="theme-toggle-btn"
             onClick={toggleTheme}
             aria-label="Toggle dark/light theme"
-            title={theme === 'dark' ? 'Switch to Clinical Daylight Mode' : 'Switch to Clinical Night / Command Center Mode'}
+            title={theme === 'dark' ? 'Switch to daylight theme' : 'Switch to evening theme'}
           >
             {theme === 'dark' ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

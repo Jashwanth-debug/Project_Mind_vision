@@ -109,10 +109,10 @@ export function getHumanStatus(riskLevel = 'MINIMAL', compositeScore = 1.0) {
   }
 
   return {
-    statusKey: 'STABLE',
+    statusKey: 'STEADY',
     icon: '🟢',
-    title: 'Looks stable',
-    subtitle: 'Your facial expressions, voice stability, and responses align with a relaxed baseline.',
+    title: 'Steady pattern reported',
+    subtitle: 'Your self-reported answers and estimated signals reflect a steady, calm pattern today.',
     color: 'var(--status-minimal-text, #10b981)',
     bgColor: 'var(--status-minimal-bg, rgba(16, 185, 129, 0.12))',
     borderColor: 'var(--status-minimal-border, rgba(16, 185, 129, 0.3))',

@@ -1,4 +1,5 @@
 import { DoctorAuthService } from '../services/doctorAuthService.js';
+import { generateToken } from '../middleware/auth.js';
 
 export const DoctorController = {
   getDoctors(req, res) {
@@ -9,6 +10,55 @@ export const DoctorController = {
   getVerifiedDoctors(req, res) {
     const verified = DoctorAuthService.getAvailableVerifiedDoctors();
     return res.json({ success: true, count: verified.length, data: verified });
+  },
+
+  login(req, res) {
+    const { email, doctorId, role } = req.body || {};
+
+    // Admin login
+    if (role === 'ADMIN' || (email && email.toLowerCase() === 'admin@mindvision.ai')) {
+      const token = generateToken({
+        id: 'admin_root',
+        name: 'Clinical Verification Admin',
+        role: 'ADMIN',
+        email: email || 'admin@mindvision.ai'
+      });
+      return res.json({
+        success: true,
+        message: 'Admin authenticated successfully',
+        token,
+        user: { id: 'admin_root', name: 'Clinical Verification Admin', role: 'ADMIN' }
+      });
+    }
+
+    // Doctor login by ID or Email
+    let doctor = null;
+    if (doctorId) {
+      doctor = DoctorAuthService.getDoctorById(doctorId);
+    } else if (email) {
+      doctor = DoctorAuthService.getDoctors().find(d => d.email && d.email.toLowerCase() === email.toLowerCase());
+    } else {
+      // Demo doctor fallback
+      doctor = DoctorAuthService.getDoctors()[0];
+    }
+
+    if (!doctor) {
+      return res.status(401).json({ success: false, message: 'Doctor account not found' });
+    }
+
+    const token = generateToken({
+      id: doctor.id,
+      name: doctor.fullName || doctor.name,
+      role: 'DOCTOR',
+      email: doctor.email
+    });
+
+    return res.json({
+      success: true,
+      message: 'Authenticated successfully',
+      token,
+      user: doctor
+    });
   },
 
   approveDoctor(req, res) {

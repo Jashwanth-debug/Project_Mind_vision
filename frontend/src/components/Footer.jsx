@@ -1,38 +1,66 @@
 import React from 'react';
 
+/**
+ * Footer - Reassuring, Patient-Focused Healthcare Footer
+ * Replaces technical inference & FACS badges with a simple trust statement.
+ */
 export default function Footer() {
   return (
-    <footer className="clinical-footer">
-      <div className="footer-container">
-        {/* Medical Disclaimer */}
-        <p className="footer-disclaimer">
-          <strong>Clinical Scope &amp; Medical Disclaimer:</strong> MindVision is an AI-assisted screening platform designed for early distress detection and decision support to assist qualified healthcare professionals. It is not an autonomous medical diagnostic tool. All clinical diagnoses and treatment decisions must be made by licensed healthcare clinicians following standard clinical evaluations and validated psychiatric batteries.
+    <footer style={{
+      backgroundColor: 'var(--card-bg)',
+      borderTop: '1px solid var(--border-color)',
+      padding: '2rem 1.5rem',
+      marginTop: 'auto',
+      transition: 'all var(--transition-base)'
+    }}>
+      <div style={{
+        maxWidth: '860px',
+        margin: '0 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.25rem',
+        textAlign: 'center'
+      }}>
+        {/* Simple Trust Reassurance */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+          fontSize: '0.9rem',
+          fontWeight: 600,
+          color: 'var(--color-primary)'
+        }}>
+          <span>🔒</span>
+          <span>Private &amp; Secure • Your check-ins remain confidential</span>
+        </div>
+
+        {/* Gentle Wellness Disclaimer */}
+        <p style={{
+          fontSize: '0.82rem',
+          color: 'var(--text-muted)',
+          lineHeight: 1.6,
+          margin: 0,
+          maxWidth: '680px',
+          alignSelf: 'center'
+        }}>
+          MindVision is designed as a gentle self-reflection tool to help you stay in touch with your well-being. It does not replace medical advice, psychological therapy, or professional diagnosis. If you ever feel in crisis, caring support is available free 24/7 by calling or texting <strong>988</strong>.
         </p>
 
-        {/* Bottom Row */}
-        <div className="footer-bottom-row">
-          <div className="compliance-badges">
-            <div className="compliance-badge">
-              <span className="compliance-badge-dot"></span>
-              <span>100% Client-Side RAM Inference</span>
-            </div>
-            <div className="compliance-badge">
-              <span className="compliance-badge-dot"></span>
-              <span>Zero-Knowledge Telemetry</span>
-            </div>
-            <div className="compliance-badge">
-              <span className="compliance-badge-dot"></span>
-              <span>HIPAA-Oriented Architecture</span>
-            </div>
-            <div className="compliance-badge">
-              <span className="compliance-badge-dot"></span>
-              <span>PyFeat + MediaPipe FACS</span>
-            </div>
-          </div>
-
-          <div className="copyright-text">
-            © 2026 MindVision Systems • Research-Grade Clinical Web Platform
-          </div>
+        {/* Bottom Bar */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          borderTop: '1px solid var(--border-color)',
+          paddingTop: '1rem',
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)'
+        }}>
+          <span>© 2026 MindVision Health • Caring wellness companion</span>
+          <span style={{ fontSize: '0.78rem' }}>Made with care for your peace of mind</span>
         </div>
       </div>
     </footer>

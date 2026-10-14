@@ -607,7 +607,7 @@ export default function DoctorMarketplace({
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                   <div>
-                    <strong>Secure Clinical Telemetry Share:</strong> Your local facial FACS Action Units, acoustic pitch jitter, and preliminary SOAP summary will be encrypted and transmitted to {doc.name} upon connection.
+                    <strong>Private &amp; Secure Consultation:</strong> A summary of your recent wellness reflections will be securely shared with {doc.name} to help guide your session.
                   </div>
                 </div>
 

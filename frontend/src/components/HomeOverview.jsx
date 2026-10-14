@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
-import { getHumanStatus, getHumanObservations, CLINICAL_DISCLAIMER } from '../utils/terminology';
+import { getHumanStatus, CLINICAL_DISCLAIMER } from '../utils/terminology';
 
+/**
+ * HomeOverview - Patient-Centered Wellness Home Screen
+ * 
+ * Production-grade, reassuring, calm interface modeled after Headspace, Calm, and Teladoc.
+ * Zero clinical jargon, zero AU codes, zero biometric signal breakdowns.
+ * One clear primary action, supportive secondary cards, and warm encouragement.
+ */
 export default function HomeOverview({
   setActiveTab,
   latestRecord = null,
@@ -8,431 +15,247 @@ export default function HomeOverview({
   userRole = 'PATIENT',
   setUserRole
 }) {
-  const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Derive latest assessment from real records or default to realistic baseline
+  // Derive latest record or realistic baseline
   const activeRecord = latestRecord || (records && records.length > 0 ? records[0] : {
-    compositeRisk: 3.4,
-    riskLevel: 'MODERATE',
-    au4: 0.38,
-    au15: 0.28,
-    prosody: 0.32,
-    sentiment: 0.35,
-    incongruence: 0.22,
-    timestamp: 'Today, Just now'
+    riskLevel: 'MINIMAL',
+    compositeRisk: 1.2,
+    timestamp: 'Today'
   });
 
+  // Human-friendly status mapping
   const humanStatus = getHumanStatus(activeRecord.riskLevel, activeRecord.compositeRisk);
-  const observations = getHumanObservations(activeRecord);
+
+  // Determine supportive message based on risk level
+  const isElevated = activeRecord.riskLevel === 'ELEVATED' || activeRecord.riskLevel === 'SEVERE';
+  const statusHeadline = isElevated ? "It might help to talk with someone" : "Steady & calm pattern reported";
+  const statusEncouragement = isElevated
+    ? "Your recent check-in showed subtle signs that things might feel a bit heavy right now. Taking a moment for gentle support can make a big difference."
+    : "Your recent check-in reflected a steady, calm pattern based on your self-reported responses. Remember to take small pauses throughout your day to nourish yourself.";
+  const statusNextStep = isElevated
+    ? "Would you like to connect with a caring counselor who can listen?"
+    : "Want to do a quick 2-minute reflection on how you're feeling today?";
 
   return (
-    <div className="home-overview" style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <div className="patient-view-shell">
       
-      {/* 1. Header: Welcoming, Modern Healthcare Identity */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, rgba(19, 111, 99, 0.08) 0%, rgba(15, 23, 42, 0.04) 100%)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '1.75rem 2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-              <span style={{ fontSize: '0.74rem', fontWeight: 800, letterSpacing: '0.08em', color: 'var(--accent-teal)', textTransform: 'uppercase' }}>
-                MINDVISION WELLNESS
-              </span>
-              <span className="clinical-status-pill minimal" style={{ fontSize: '0.68rem', padding: '1px 8px' }}>
-                On-Device Privacy Protected
-              </span>
-            </div>
-            <h1 style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0 0 0.4rem 0', color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-              Your Wellness Check-in
-            </h1>
-            <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', margin: 0, maxWidth: '640px', lineHeight: 1.55 }}>
-              Understand your check-in signals in plain language. Get clear, reassuring next steps with zero confusing medical jargon.
-            </p>
-          </div>
-
-          {/* Quick Experience Switcher */}
-          <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--bg-secondary)', padding: '3px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border-color)' }}>
-            <button
-              type="button"
-              onClick={() => { if (setUserRole) setUserRole('PATIENT'); }}
-              style={{
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: userRole === 'PATIENT' ? 'var(--card-bg)' : 'transparent',
-                color: userRole === 'PATIENT' ? 'var(--accent-teal)' : 'var(--text-muted)',
-                fontWeight: userRole === 'PATIENT' ? 700 : 500,
-                fontSize: '0.72rem',
-                cursor: 'pointer',
-                boxShadow: userRole === 'PATIENT' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-              }}
-            >
-              👤 Patient View
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (setUserRole) setUserRole('CLINICIAN');
-                setActiveTab('portal');
-              }}
-              style={{
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: userRole === 'CLINICIAN' ? 'var(--card-bg)' : 'transparent',
-                color: userRole === 'CLINICIAN' ? 'var(--accent-teal)' : 'var(--text-muted)',
-                fontWeight: userRole === 'CLINICIAN' ? 700 : 500,
-                fontSize: '0.72rem',
-                cursor: 'pointer'
-              }}
-            >
-              🩺 Clinician View
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (setUserRole) setUserRole('RESEARCHER');
-                setActiveTab('demo');
-              }}
-              style={{
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: userRole === 'RESEARCHER' ? 'var(--card-bg)' : 'transparent',
-                color: userRole === 'RESEARCHER' ? 'var(--accent-teal)' : 'var(--text-muted)',
-                fontWeight: userRole === 'RESEARCHER' ? 700 : 500,
-                fontSize: '0.72rem',
-                cursor: 'pointer'
-              }}
-            >
-              🔬 Technical View
-            </button>
-          </div>
+      {/* 1. Welcoming Hero Banner with One Obvious Primary CTA */}
+      <div className="patient-hero-card">
+        <div className="patient-hero-kicker">
+          <span>🌿 MindVision Wellness</span>
+          <span style={{ color: 'var(--text-muted)' }}>•</span>
+          <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.78rem' }}>🔒 Private &amp; Secure</span>
         </div>
 
-        {/* Primary Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+        <h1 className="patient-hero-title">
+          Hi there, how are you feeling today?
+        </h1>
+
+        <p className="patient-hero-subtitle">
+          Take a quiet moment for yourself. Our gentle, voice-guided check-in takes just 2 minutes and helps you understand how you're really doing.
+        </p>
+
+        {/* The One Clear Primary Action */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <button
-            className="btn-primary"
+            type="button"
+            className="btn-patient-primary"
             onClick={() => setActiveTab('assessment')}
-            style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem' }}
           >
-            <span>📝</span>
-            <span>Start 2-Minute Check-in</span>
+            <span>Start Check-in</span>
+            <span style={{ fontSize: '1.2rem' }}>›</span>
           </button>
-          <button
-            className="btn-secondary"
-            onClick={() => setActiveTab('results')}
-            style={{ padding: '0.6rem 1.15rem', fontSize: '0.85rem' }}
-          >
-            <span>📊</span>
-            <span>View My Results History</span>
-          </button>
-          <button
-            className="btn-secondary"
-            onClick={() => setActiveTab('doctors')}
-            style={{ padding: '0.6rem 1.15rem', fontSize: '0.85rem' }}
-          >
-            <span>🩺</span>
-            <span>Talk to a Verified Clinician</span>
-          </button>
+          <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+            ⏱️ Takes only 2–3 minutes
+          </span>
         </div>
       </div>
 
-      {/* 2. Main Result Banner: Simple, Clear & Reassuring */}
+      {/* 2. Previous Result (Human, Warm, Simple — No Biometric Breakdown) */}
       <div
         style={{
-          background: 'var(--card-bg)',
-          border: `1.5px solid ${humanStatus.borderColor}`,
-          borderRadius: 'var(--radius-md)',
-          padding: '1.5rem',
+          backgroundColor: 'var(--card-bg)',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid var(--border-color)',
+          padding: '1.75rem 2rem',
           boxShadow: 'var(--shadow-card)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1rem',
-          position: 'relative',
-          overflow: 'hidden'
+          gap: '1.25rem'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '2.4rem', lineHeight: 1 }}>{humanStatus.icon}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div
+              style={{
+                width: '54px',
+                height: '54px',
+                borderRadius: '50%',
+                backgroundColor: isElevated ? 'var(--status-elevated-bg)' : 'var(--status-minimal-bg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.8rem',
+                flexShrink: 0
+              }}
+            >
+              {isElevated ? '🧡' : '🌱'}
+            </div>
             <div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                CURRENT ASSESSMENT
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                Your Latest Check-in Summary
               </div>
-              <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: '0.15rem 0 0.35rem 0', color: humanStatus.color }}>
-                {humanStatus.title}
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                {statusHeadline}
               </h2>
-              <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, maxWidth: '640px' }}>
-                {humanStatus.subtitle}
-              </p>
             </div>
           </div>
 
-          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Check-in Timestamp</span>
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-              {activeRecord.timestamp || 'Recent Session'}
-            </span>
-          </div>
-        </div>
-
-        {/* Essential Clinical Disclaimer (Visible but calm) */}
-        <div
-          style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '0.65rem 0.95rem',
-            fontSize: '0.76rem',
-            color: 'var(--text-muted)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            lineHeight: 1.4
-          }}
-        >
-          <span style={{ fontSize: '0.95rem' }}>ℹ️</span>
-          <span>
-            <strong>Important note:</strong> {CLINICAL_DISCLAIMER}
-          </span>
-        </div>
-      </div>
-
-      {/* 3. What We Noticed: 3 Simple Observation Cards (No Raw Numbers) */}
-      <div>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-            What We Noticed
-          </h2>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            A summary of the subtle cues observed during your check-in:
-          </span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-          {/* Card A: Voice */}
-          <div className="workstation-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(19, 111, 99, 0.1)', color: 'var(--accent-teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>
-                🎙️
-              </div>
-              <div>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, margin: 0 }}>Voice Patterns</h3>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Speaking tone &amp; pitch stability</span>
-              </div>
-            </div>
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 }}>
-              {observations.voice}
-            </p>
-          </div>
-
-          {/* Card B: Responses */}
-          <div className="workstation-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>
-                💬
-              </div>
-              <div>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, margin: 0 }}>Reported Feelings</h3>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Written statements &amp; daily function</span>
-              </div>
-            </div>
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 }}>
-              {observations.responses}
-            </p>
-          </div>
-
-          {/* Card C: Facial Signals */}
-          <div className="workstation-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(234, 179, 8, 0.1)', color: '#eab308', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>
-                👁️
-              </div>
-              <div>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, margin: 0 }}>Facial Signals</h3>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Brow &amp; mouth micro-tension</span>
-              </div>
-            </div>
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 }}>
-              {observations.facial}
-            </p>
-          </div>
-        </div>
-
-        {/* Signal Divergence Callout if present */}
-        {observations.divergence && (
-          <div
+          <span
             style={{
-              marginTop: '1rem',
-              padding: '0.85rem 1.1rem',
-              background: 'rgba(249, 115, 22, 0.08)',
-              border: '1px solid rgba(249, 115, 22, 0.25)',
-              borderRadius: 'var(--radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
               fontSize: '0.82rem',
-              color: 'var(--text-secondary)'
+              color: 'var(--text-muted)',
+              backgroundColor: 'var(--bg-secondary)',
+              padding: '0.3rem 0.75rem',
+              borderRadius: 'var(--radius-pill)'
             }}
           >
-            <span style={{ fontSize: '1.1rem' }}>💡</span>
-            <div>
-              <strong>Subtle Difference Noticed:</strong> {observations.divergence}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 4. What Should You Do? Recommended Next Actions */}
-      <div
-        style={{
-          background: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.4rem 1.5rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-teal)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              RECOMMENDED NEXT STEP
-            </span>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0.2rem 0 0.3rem 0', color: 'var(--text-primary)' }}>
-              Consider speaking with a qualified healthcare professional
-            </h3>
-            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, maxWidth: '640px' }}>
-              If your current stress, sleep disruptions, or emotional fatigue persist, discussing these observations with a licensed clinician can provide peace of mind and personalized support strategies.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <button
-              className="btn-primary"
-              onClick={() => setActiveTab('doctors')}
-              style={{ padding: '0.65rem 1.25rem', fontSize: '0.84rem' }}
-            >
-              <span>📞</span>
-              <span>Talk to a Clinician (from ₹0)</span>
-            </button>
-            <button
-              className="btn-secondary"
-              onClick={() => setActiveTab('results')}
-              style={{ padding: '0.65rem 1rem', fontSize: '0.84rem' }}
-            >
-              <span>View My Results History</span>
-            </button>
-          </div>
+            {activeRecord.timestamp || 'Recent reflection'}
+          </span>
         </div>
-      </div>
 
-      {/* 5. Progressive Disclosure: "How We Got This Result" (Collapsed by default) */}
-      <div
-        style={{
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-md)',
-          overflow: 'hidden'
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setShowHowItWorks(!showHowItWorks)}
+        {/* Soft Sentence of Encouragement */}
+        <p style={{ fontSize: '1.02rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+          {statusEncouragement}
+        </p>
+
+        {/* One Simple Next-Step Suggestion */}
+        <div
           style={{
-            width: '100%',
-            padding: '1rem 1.25rem',
-            background: 'none',
-            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            cursor: 'pointer',
-            color: 'var(--text-primary)',
-            fontSize: '0.88rem',
-            fontWeight: 650
+            padding: '1rem 1.25rem',
+            backgroundColor: 'var(--accent-teal-soft-bg)',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--accent-teal-border)',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span>🔍</span>
-            <span>How did we determine this? (Explainability &amp; Methodology)</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <span style={{ fontSize: '1.2rem' }}>💡</span>
+            <span style={{ fontSize: '0.92rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+              {statusNextStep}
+            </span>
           </div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            {showHowItWorks ? 'Hide Explanation ▲' : 'Show Explanation ▼'}
-          </span>
-        </button>
 
-        {showHowItWorks && (
-          <div style={{ padding: '0 1.25rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-              MindVision compares information from three synchronized channels during your check-in:
-            </p>
-            <ol style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 0 1.25rem', padding: 0 }}>
-              <li><strong>What you reported:</strong> Analyzing the themes of fatigue, pressure, or coping mentioned in your written or spoken answers.</li>
-              <li><strong>Voice variations:</strong> Examining subtle changes in speaking stability, pacing, and vocal pitch.</li>
-              <li><strong>Facial expression patterns:</strong> Measuring momentary micro-tensions around the brow and mouth without recording or uploading your face.</li>
-            </ol>
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-              All analysis runs directly on your device via privacy-first WebAssembly (WASM). No raw audio or video ever leaves your computer.
-            </p>
+          <button
+            type="button"
+            onClick={() => setActiveTab(isElevated ? 'doctors' : 'assessment')}
+            style={{
+              backgroundColor: 'var(--accent-teal)',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: 'var(--radius-pill)',
+              padding: '0.45rem 1rem',
+              fontSize: '0.86rem',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            {isElevated ? 'Explore Support Options' : 'Take a Check-in'}
+          </button>
+        </div>
+      </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                style={{ fontSize: '0.76rem', padding: '0.4rem 0.85rem' }}
-              >
-                {showTechnicalDetails ? 'Hide Technical Metrics' : '🔬 View Technical Metrics (AU4, AU15, Jitter)'}
-              </button>
+      {/* 3. Secondary Actions as Friendly, Beautiful Cards (Not Dense Buttons) */}
+      <div className="patient-cards-grid">
+        {/* Card A: My Past Check-ins */}
+        <div
+          className="patient-action-card"
+          onClick={() => setActiveTab('results')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter') setActiveTab('results'); }}
+        >
+          <div>
+            <div className="patient-action-card-icon">
+              <span>📅</span>
             </div>
-
-            {/* Deep Technical Drawer for interested users */}
-            {showTechnicalDetails && (
-              <div
-                style={{
-                  marginTop: '0.75rem',
-                  padding: '1rem',
-                  background: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.65rem',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '0.76rem'
-                }}
-              >
-                <div style={{ fontWeight: 700, color: 'var(--accent-teal)' }}>
-                  TECHNICAL TELEMETRY BREAKDOWN:
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
-                  <div>AU04 Brow Furrow: <strong>{activeRecord.au4 || '0.38'}</strong></div>
-                  <div>AU15 Lip Depressor: <strong>{activeRecord.au15 || '0.28'}</strong></div>
-                  <div>Acoustic Jitter: <strong>{activeRecord.prosody || '0.32'}</strong></div>
-                  <div>Linguistic Polarity: <strong>{activeRecord.sentiment || '0.35'}</strong></div>
-                  <div>Cross-Modal Incongruence: <strong>{activeRecord.incongruence || '0.22'}</strong></div>
-                  <div>Raw Composite Score: <strong>{activeRecord.compositeRisk || '3.4'} / 10</strong></div>
-                </div>
-                <div style={{ marginTop: '0.25rem', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-                  Calibrated against DISFA, Extended Cohn-Kanade (CK+), and DAIC-WOZ scientific benchmark corpora.
-                </div>
-              </div>
-            )}
+            <h2 className="patient-action-card-title">
+              See my past check-ins
+            </h2>
+            <p className="patient-action-card-desc">
+              View your personal timeline of previous check-ins and notice how your energy and mood evolve over time.
+            </p>
           </div>
-        )}
+          <div className="patient-action-card-link">
+            <span>View your history</span>
+            <span>›</span>
+          </div>
+        </div>
+
+        {/* Card B: Talk to a Counselor */}
+        <div
+          className="patient-action-card"
+          onClick={() => setActiveTab('doctors')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter') setActiveTab('doctors'); }}
+        >
+          <div>
+            <div className="patient-action-card-icon" style={{ backgroundColor: 'var(--accent-warm-soft)', color: 'var(--crisis-title-color)' }}>
+              <span>💬</span>
+            </div>
+            <h2 className="patient-action-card-title">
+              Talk to someone
+            </h2>
+            <p className="patient-action-card-desc">
+              Connect in a safe, confidential space with verified healthcare professionals who listen without judgment.
+            </p>
+          </div>
+          <div className="patient-action-card-link" style={{ color: 'var(--crisis-title-color)' }}>
+            <span>Find a counselor</span>
+            <span>›</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Reassuring, Calm "Need Help Now?" Crisis Support Card (Not Alarming Red) */}
+      <div className="patient-crisis-banner">
+        <div className="patient-crisis-text">
+          <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>💛</span>
+          <div>
+            <h2 className="patient-crisis-title">
+              Need immediate support or someone to talk to right now?
+            </h2>
+            <p className="patient-crisis-subtitle">
+              Free, confidential help is available 24/7. Call or text <strong>988</strong> to reach the Suicide &amp; Crisis Lifeline, or text <strong>HOME</strong> to <strong>741741</strong>.
+            </p>
+          </div>
+        </div>
+        <a
+          href="tel:988"
+          className="patient-crisis-cta"
+        >
+          <span>📞</span>
+          <span>Call or Text 988</span>
+        </a>
+      </div>
+
+      {/* 5. Quiet, Non-Alarming Disclaimer */}
+      <div
+        style={{
+          textAlign: 'center',
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)',
+          lineHeight: 1.5,
+          padding: '0 1rem'
+        }}
+      >
+        🔒 <strong>Your privacy is protected:</strong> All check-in reflections are kept confidential and are never shared without your permission. MindVision is designed as a wellness self-reflection companion and does not replace professional medical diagnosis or psychiatric care.
       </div>
 
     </div>

@@ -8,89 +8,109 @@
   --font-display: 'Plus Jakarta Sans', var(--font-sans);
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
-  /* Restrained, Architectural Radii (Zero Puffy/AI-Template Curves) */
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-pill: 9999px; /* Reserved strictly for micro status dots and circular badges */
+  /* Friendly, Accessible Radii for Calm Healthcare UX (8–16px default) */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
 
-  /* Precision Transitions */
-  --transition-fast: 0.12s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-base: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-smooth: 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  /* 8px Spacing Grid System */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Precision Fluid Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-base: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================================================
-   LIGHT MODE: Refined Clinical Porcelain & Stone Workstation
-   Low eye-strain, non-glare, authoritative healthcare palette
+   LIGHT MODE (Default): Soft, Low-Strain, Calm Patient-Centered Palette
+   Warm neutral foundation, calming sage/teal, gentle warm accents, 100% WCAG AA
    ========================================================================== */
 :root, [data-theme="light"] {
-  --bg-primary: #F2F4F3;         /* Warm-cool clinical stone foundation */
-  --bg-secondary: #E8ECE9;       /* Subdued control track & inset surface */
-  --card-bg: #FFFFFF;            /* Pure clinical surface tile */
-  --card-bg-subtle: #F6F8F7;      /* Soft structural section well */
-  --card-header-bg: #FAFCFA;      /* Architectural header surface */
-  --card-bg-elevated: #FFFFFF;    /* Crisp elevated dialogs */
+  --bg-primary: #FAFAF9;         /* Soft warm off-white neutral (soothing, zero harsh glare) */
+  --bg-secondary: #F3F4F3;       /* Gentle tinted card background / inset track */
+  --card-bg: #FFFFFF;            /* Clean white card surface */
+  --card-bg-subtle: #F7F9F8;     /* Soft structural section well */
+  --card-header-bg: #FFFFFF;     /* Calm header surface */
+  --card-bg-elevated: #FFFFFF;   /* Smooth elevated cards */
 
-  /* Precision 1px Hairline Dividers */
-  --border-color: #D8DFDC;
-  --border-hover: #B8C2BE;
-  --border-strong: #8F9D98;
+  /* Soft, Low-Contrast Dividers */
+  --border-color: #E6EAE8;
+  --border-hover: #D0D8D4;
+  --border-strong: #A8B5B0;
 
-  /* Deep High-Legibility Clinical Typography */
-  --text-primary: #192127;       /* Deep slate graphite (avoids sterile #000) */
-  --text-secondary: #4A5560;     /* Clear readable secondary prose */
-  --text-muted: #75818D;         /* Subdued technical metadata */
+  /* High-Contrast, Warm-Tone WCAG AAA/AA Typography (Never harsh #000) */
+  --text-primary: #2A2A2E;       /* Warm dark-gray (WCAG AAA: 13.7:1 on #FAFAF9) */
+  --text-secondary: #4F575E;     /* Comfortable body prose (WCAG AAA: 7.0:1 on #FAFAF9) */
+  --text-muted: #6A757D;         /* Subdued metadata (WCAG AA: 4.51:1 on #FAFAF9) */
 
-  /* Primary Accent: Deep Surgical Petrol / Clinical Teal */
-  --accent-teal: #136F63;
-  --accent-teal-hover: #0E574D;
-  --accent-teal-subtle: rgba(19, 111, 99, 0.08);
-  --accent-teal-border: rgba(19, 111, 99, 0.25);
-  --accent-teal-soft-bg: #E6F4F2;
+  /* Primary Accent: Calming Sage Teal (Trust & Healing, WCAG AA: 5.01:1 on white) */
+  --accent-teal: #257C6F;
+  --accent-teal-hover: #1C6358;
+  --accent-teal-subtle: rgba(37, 124, 111, 0.08);
+  --accent-teal-border: rgba(37, 124, 111, 0.22);
+  --accent-teal-soft-bg: #EFF7F5;
 
-  /* Semantic Status Tokens (Clinically Calibrated) */
-  --status-minimal-dot: #1E7E51;
-  --status-minimal-bg: #E8F5EE;
-  --status-minimal-text: #17653F;
-  --status-minimal-border: rgba(30, 126, 81, 0.25);
+  /* Secondary Accent: Gentle Warm Amber / Coral (Warm, supportive, non-alarming) */
+  --accent-warm: #E8A87C;
+  --accent-warm-soft: #FDF7F3;
+  --accent-warm-border: rgba(232, 168, 124, 0.30);
+  --crisis-title-color: #8C3B24;
+  --crisis-subtitle-color: #692A18;
+  --crisis-cta-bg: #C05638;
+  --crisis-cta-hover: #A6452B;
 
-  --status-elevated-dot: #C06D10;
-  --status-elevated-bg: #FFF5E5;
-  --status-elevated-text: #965307;
-  --status-elevated-border: rgba(192, 109, 16, 0.25);
+  /* Semantic Status Tokens (Desaturated, Friendly, WCAG AA Compliant) */
+  --status-minimal-dot: #2D8A61;
+  --status-minimal-bg: #EDF8F2;
+  --status-minimal-text: #1B6543;   /* WCAG AA: 6.46:1 on #EDF8F2 */
+  --status-minimal-border: rgba(45, 138, 97, 0.22);
 
-  --status-severe-dot: #C24138;
-  --status-severe-bg: #FCEFEF;
-  --status-severe-text: #9B2D25;
-  --status-severe-border: rgba(194, 65, 56, 0.28);
+  --status-elevated-dot: #D97706;
+  --status-elevated-bg: #FEF7EE;
+  --status-elevated-text: #92400E;  /* WCAG AA: 6.67:1 on #FEF7EE */
+  --status-elevated-border: rgba(217, 119, 6, 0.22);
 
-  /* Emergency Triage Action */
-  --emergency-btn-bg: #C24138;
-  --emergency-btn-hover: #A8352D;
+  --status-severe-dot: #D9534F;
+  --status-severe-bg: #FDF2F2;
+  --status-severe-text: #A93226;    /* WCAG AA: 6.04:1 on #FDF2F2 */
+  --status-severe-border: rgba(217, 83, 79, 0.25);
+
+  /* Gentle Emergency & Crisis Support Action (Calm, Reassuring, WCAG AA: 4.92:1) */
+  --emergency-btn-bg: #C44540;
+  --emergency-btn-hover: #AA3834;
   --emergency-btn-text: #FFFFFF;
 
-  /* Information / Diagnostics */
-  --status-info-dot: #2E6588;
-  --status-info-bg: #EDF4F9;
-  --status-info-text: #214C68;
-  --status-info-border: rgba(46, 101, 136, 0.25);
+  /* Information / Guidance */
+  --status-info-dot: #3B82A6;
+  --status-info-bg: #EEF6FB;
+  --status-info-text: #1E5C7E;
+  --status-info-border: rgba(59, 130, 166, 0.22);
 
   /* Calibrated Inputs & Sliders */
   --input-bg: #FFFFFF;
-  --input-border: #D8DFDC;
-  --input-focus: rgba(19, 111, 99, 0.25);
-  --slider-track: #CBD5CF;
-  --slider-thumb: #192127;
+  --input-border: #E0E5E2;
+  --input-focus: rgba(37, 124, 111, 0.25);
+  --slider-track: #DCE3DF;
+  --slider-thumb: #257C6F;
 
-  /* Engineered Restrained Shadows */
-  --shadow-subtle: 0 1px 2px rgba(25, 33, 39, 0.04);
-  --shadow-card: 0 1px 3px rgba(25, 33, 39, 0.03), 0 2px 6px rgba(25, 33, 39, 0.02);
-  --shadow-elevated: 0 8px 24px rgba(25, 33, 39, 0.08);
+  /* Soft, Calming Diffused Shadows */
+  --shadow-subtle: 0 1px 3px rgba(35, 43, 47, 0.04);
+  --shadow-card: 0 2px 8px rgba(35, 43, 47, 0.04), 0 1px 2px rgba(35, 43, 47, 0.02);
+  --shadow-elevated: 0 12px 32px rgba(35, 43, 47, 0.07), 0 4px 12px rgba(35, 43, 47, 0.03);
 
-  --scrollbar-thumb: #CBD5CF;
+  --scrollbar-thumb: #D4DDD9;
 }
 
 /* ==========================================================================
@@ -112,8 +132,8 @@
 
   /* High-Contrast Soft Off-White Typography */
   --text-primary: #E6EDF3;
-  --text-secondary: #8B949E;
-  --text-muted: #656D76;
+  --text-secondary: #94A3B8;
+  --text-muted: #94A3B8;
 
   /* Primary Accent: Controlled Petrol Cyan-Teal */
   --accent-teal: #14B8A6;
@@ -121,6 +141,15 @@
   --accent-teal-subtle: rgba(20, 184, 166, 0.1);
   --accent-teal-border: rgba(20, 184, 166, 0.25);
   --accent-teal-soft-bg: rgba(20, 184, 166, 0.12);
+
+  /* Secondary Accent Warm & Crisis Tokens */
+  --accent-warm: #FDBA74;
+  --accent-warm-soft: rgba(251, 146, 60, 0.10);
+  --accent-warm-border: rgba(251, 146, 60, 0.25);
+  --crisis-title-color: #FDBA74;
+  --crisis-subtitle-color: #CBD5E1;
+  --crisis-cta-bg: #C05638;
+  --crisis-cta-hover: #D96B4D;
 
   /* Status Tokens */
   --status-minimal-dot: #2EA043;
@@ -171,9 +200,6 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  transition: background-color var(--transition-fast),
-              border-color var(--transition-fast),
-              color var(--transition-fast);
 }
 
 html, body {
@@ -1976,4 +2002,463 @@ p {
 .copilot-input-field:focus {
   border-color: var(--accent-teal);
   box-shadow: 0 0 0 2px var(--accent-teal-subtle);
+}
+
+/* ==========================================================================
+   PATIENT-CENTERED WELLNESS DESIGN SYSTEM EXTENSIONS
+   Calm, Reassuring, Accessible, Zero Jargon (Headspace / Calm / Teladoc tier)
+   ========================================================================== */
+
+/* Patient Layout Shell */
+.patient-view-shell {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 3rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Patient Hero Card */
+.patient-hero-card {
+  background: linear-gradient(145deg, var(--card-bg) 0%, var(--accent-teal-soft-bg) 100%);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 2.25rem;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+}
+
+[data-theme="dark"] .btn-patient-primary {
+  background-color: #0F766E;
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] .btn-patient-primary:hover {
+  background-color: #115E59;
+}
+
+.patient-hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-teal);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+.patient-hero-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin: 0 0 0.75rem 0;
+}
+
+.patient-hero-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 1.75rem 0;
+  max-width: 620px;
+}
+
+/* Primary Big Reassuring CTA */
+.btn-patient-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background-color: var(--accent-teal);
+  color: #FFFFFF;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 0.95rem 2rem;
+  border-radius: var(--radius-pill);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(27, 115, 105, 0.25);
+  transition: all var(--transition-base);
+  text-decoration: none;
+}
+
+.btn-patient-primary:hover {
+  background-color: var(--accent-teal-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(27, 115, 105, 0.35);
+}
+
+.btn-patient-primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary Friendly Cards Grid */
+.patient-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.patient-action-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-subtle);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+  text-decoration: none;
+}
+
+.patient-action-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-2px);
+}
+
+.patient-action-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background-color: var(--accent-teal-soft-bg);
+  color: var(--accent-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+}
+
+.patient-action-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.4rem 0;
+}
+
+.patient-action-card-desc {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 1rem 0;
+  flex: 1;
+}
+
+.patient-action-card-link {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent-teal);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Calm Breathing & Listening Orb */
+@keyframes calm-breathe {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(27, 115, 105, 0.2);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 20px rgba(27, 115, 105, 0);
+  }
+  100% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(27, 115, 105, 0);
+  }
+}
+
+@keyframes calm-listening-wave {
+  0%, 100% { height: 8px; }
+  50% { height: 32px; }
+}
+
+.calm-breathing-orb {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #EDF7F5 0%, #D8EEE9 100%);
+  border: 2px solid var(--accent-teal-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  animation: calm-breathe 4.5s ease-in-out infinite;
+  transition: all var(--transition-smooth);
+}
+
+.calm-breathing-orb.listening {
+  border-color: var(--accent-teal);
+  background: radial-gradient(circle, rgba(27, 115, 105, 0.15) 0%, rgba(27, 115, 105, 0.05) 100%);
+  animation: calm-breathe 2.8s ease-in-out infinite;
+}
+
+/* Gentle Waveform Visualizer */
+.calm-waveform-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 48px;
+  margin: 1rem 0;
+}
+
+.calm-waveform-bar {
+  width: 5px;
+  border-radius: var(--radius-pill);
+  background-color: var(--accent-teal);
+  animation: calm-listening-wave 1.2s ease-in-out infinite;
+}
+
+.calm-waveform-bar:nth-child(1) { animation-delay: 0.1s; }
+.calm-waveform-bar:nth-child(2) { animation-delay: 0.3s; }
+.calm-waveform-bar:nth-child(3) { animation-delay: 0.15s; }
+.calm-waveform-bar:nth-child(4) { animation-delay: 0.4s; }
+.calm-waveform-bar:nth-child(5) { animation-delay: 0.25s; }
+
+/* Progress Bar */
+.patient-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.patient-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.patient-progress-track {
+  width: 100%;
+  height: 8px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.patient-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-teal) 0%, #2EBFA5 100%);
+  border-radius: var(--radius-pill);
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Patient Gentle Result Banner */
+.patient-result-card {
+  background-color: var(--card-bg);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-color);
+  padding: 2.25rem;
+  box-shadow: var(--shadow-card);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.patient-result-icon-wrapper {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  background-color: var(--status-minimal-bg);
+  color: var(--status-minimal-text);
+  margin-bottom: 0.25rem;
+}
+
+.patient-result-headline {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.015em;
+}
+
+.patient-result-explanation {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 580px;
+  margin: 0;
+}
+
+/* Reassuring Crisis Banner (Calm Amber / Rose, never neon red) */
+.patient-crisis-banner {
+  background-color: var(--accent-warm-soft);
+  border: 1px solid var(--accent-warm-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.patient-crisis-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.patient-crisis-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--crisis-title-color);
+  margin: 0 0 0.2rem 0;
+}
+
+.patient-crisis-subtitle {
+  font-size: 0.88rem;
+  color: var(--crisis-subtitle-color);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.patient-crisis-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--crisis-cta-bg);
+  color: #FFFFFF;
+  padding: 0.6rem 1.15rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  border: none;
+  cursor: pointer;
+}
+
+.patient-crisis-cta:hover {
+  background-color: var(--crisis-cta-hover);
+}
+
+/* Discreet Clinician Link in Footer */
+.clinician-access-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0.25rem;
+  transition: color var(--transition-fast);
+}
+
+.clinician-access-btn:hover {
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   ACCESSIBILITY & RESPONSIVE POLISH (Task 9)
+   ========================================================================== */
+
+/* High-Visibility Accessible Focus Ring */
+:focus-visible {
+  outline: 2.5px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2.5px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Mobile & Tablet Responsive Optimizations */
+@media (max-width: 768px) {
+  .nav-container {
+    padding: 0 1rem;
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .nav-links {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    gap: 0.25rem;
+  }
+
+  .nav-link-btn {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.8rem;
+  }
+
+  .patient-hero-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .patient-hero-title {
+    font-size: 1.55rem;
+  }
+
+  .patient-hero-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .patient-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .patient-result-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .patient-result-headline {
+    font-size: 1.45rem;
+  }
+
+  .patient-crisis-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .patient-crisis-cta {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .patient-view-shell {
+    padding: 0.5rem 0.75rem 2rem 0.75rem;
+  }
+
+  .btn-patient-primary {
+    width: 100%;
+    justify-content: center;
+  }
 }

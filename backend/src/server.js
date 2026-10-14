@@ -20,14 +20,16 @@ class SimpleRouter {
     this.routes = [];
   }
 
-  add(method, path, handler) {
-    this.routes.push({ method, path, handler });
+  add(method, path, ...handlers) {
+    const handler = handlers.pop();
+    const middlewares = handlers;
+    this.routes.push({ method, path, handler, middlewares });
   }
 
-  get(path, handler) { this.add('GET', path, handler); }
-  post(path, handler) { this.add('POST', path, handler); }
-  put(path, handler) { this.add('PUT', path, handler); }
-  delete(path, handler) { this.add('DELETE', path, handler); }
+  get(path, ...handlers) { this.add('GET', path, ...handlers); }
+  post(path, ...handlers) { this.add('POST', path, ...handlers); }
+  put(path, ...handlers) { this.add('PUT', path, ...handlers); }
+  delete(path, ...handlers) { this.add('DELETE', path, ...handlers); }
 
   match(method, urlPath) {
     for (const r of this.routes) {
@@ -51,7 +53,7 @@ class SimpleRouter {
       }
 
       if (matched) {
-        return { handler: r.handler, params };
+        return { handler: r.handler, middlewares: r.middlewares || [], params };
       }
     }
     return null;
@@ -135,7 +137,14 @@ const server = http.createServer(async (req, res) => {
   if (matched) {
     req.params = matched.params;
     try {
-      return matched.handler(req, res);
+      const runMiddlewares = (index = 0) => {
+        if (index < matched.middlewares.length) {
+          const mw = matched.middlewares[index];
+          return mw(req, res, () => runMiddlewares(index + 1));
+        }
+        return matched.handler(req, res);
+      };
+      return runMiddlewares();
     } catch (err) {
       console.error('API Error:', err);
       return res.status(500).json({ success: false, error: err.message });

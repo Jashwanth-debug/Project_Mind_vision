@@ -12,6 +12,7 @@ import LiveSensorModal from './components/LiveSensorModal';
 import AdminVerificationView from './components/AdminVerificationView';
 import DoctorAuthModal from './components/DoctorAuthModal';
 import LongitudinalComparisonView from './components/LongitudinalComparisonView';
+import PatientHistoryView from './components/PatientHistoryView';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
 import { createTeletherapySession } from './data/clinicians';
@@ -71,7 +72,13 @@ const INITIAL_RECORDS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home'); // Default to Patient Wellness Overview
-  const [theme, setTheme] = useState('dark'); // Default to refined clinical dark workstation
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('mindvision_theme') || 'light';
+    } catch {
+      return 'light';
+    }
+  });
   const [userRole, setUserRole] = useState(() => DoctorAuthService.getCurrentSession()?.role || 'PATIENT');
   const [isSensorOpen, setIsSensorOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -91,6 +98,11 @@ export default function App() {
   // Handle Theme switching & html data-theme attribute
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('mindvision_theme', theme);
+    } catch {
+      // Ignored
+    }
   }, [theme]);
 
   const toggleTheme = () => {
@@ -237,7 +249,11 @@ export default function App() {
         )}
 
         {activeTab === 'results' && (
-          <LongitudinalComparisonView currentRecord={records[0]} />
+          userRole === 'PATIENT' ? (
+            <PatientHistoryView records={records} setActiveTab={setActiveTab} />
+          ) : (
+            <LongitudinalComparisonView currentRecord={records[0]} />
+          )
         )}
 
         {activeTab === 'demo' && (

@@ -43,7 +43,7 @@ export const INITIAL_CLINICIANS = [
     waitMinutes: '< 5 mins',
     nextSlot: 'Instant Video Consult',
     prime: true,
-    bio: '12+ years experience at NIMHANS. Specializes in rapid emotional stabilization, quantitative FACS micro-expression correlation, and holistic treatment of masked clinical depression.'
+    bio: '12+ years experience at NIMHANS. Specializes in emotional stabilization, compassionate listening, and holistic treatment of mood and anxiety.'
   },
   {
     id: 'doc_rajesh_nair',
@@ -54,8 +54,8 @@ export const INITIAL_CLINICIANS = [
     title: 'Chief Neuropsychiatrist & Crisis Specialist',
     qualification: 'MBBS, MD Neuropsychiatry (AIIMS New Delhi), MRCPsych (UK)',
     degrees: 'MBBS, MD, MRCPsych',
-    specialization: 'Acute Crisis Stabilization & Acoustic Prosody Analysis',
-    specialties: ['Acute Crisis Stabilization', 'Acoustic Prosody Analysis', 'Pharmacotherapy', 'Crisis Intervention'],
+    specialization: 'Acute Crisis Stabilization & Empathetic Communication',
+    specialties: ['Acute Crisis Stabilization', 'Empathetic Communication', 'Pharmacotherapy', 'Crisis Intervention'],
     languages: ['English', 'Hindi', 'Malayalam'],
     consultationFee: 349.00,
     originalFee: 750.00,

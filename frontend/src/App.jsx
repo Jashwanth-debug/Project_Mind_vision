@@ -13,8 +13,11 @@ import AdminVerificationView from './components/AdminVerificationView';
 import DoctorAuthModal from './components/DoctorAuthModal';
 import LongitudinalComparisonView from './components/LongitudinalComparisonView';
 import PatientHistoryView from './components/PatientHistoryView';
+import CrisisSupport from './components/CrisisSupport';
+import ErrorBoundary from './components/ErrorBoundary';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
+import { PageTransition } from './components/primitives';
 import { createTeletherapySession } from './data/clinicians';
 import { DoctorAuthService } from './services/doctorAuthService';
 
@@ -23,6 +26,7 @@ const INITIAL_RECORDS = [
   {
     id: 'eefd6570a2',
     timestamp: '9/23/2026, 10:25:09 PM',
+    dateIso: '2026-09-23T22:25:09.000Z',
     au4: 0.07,
     au15: 0.04,
     prosody: 0,
@@ -30,11 +34,19 @@ const INITIAL_RECORDS = [
     compositeRisk: 1.2,
     incongruence: 0.11,
     riskLevel: 'MINIMAL',
-    text: "Patient states: 'Routine bi-weekly check-in. Work load is manageable and sleep is restful.'"
+    summary: 'Steady & calm pattern reported',
+    explanation: 'Your self-reported answers and estimated signals reflect a steady, calm pattern today.',
+    text: "Patient states: 'Routine bi-weekly check-in. Work load is manageable and sleep is restful.'",
+    cues: {
+      words: 'Routine bi-weekly check-in. Work load is manageable and sleep is restful.',
+      speakingRhythm: 'Natural pauses, warmth, and steadiness in your voice tone.',
+      gentleExpressions: 'Subtle signs of brow concentration and relaxed facial muscles.'
+    }
   },
   {
     id: '7d2b8cd2f4',
     timestamp: '9/23/2026, 10:15:51 PM',
+    dateIso: '2026-09-23T22:15:51.000Z',
     au4: 0,
     au15: 0.02,
     prosody: 0,
@@ -42,11 +54,19 @@ const INITIAL_RECORDS = [
     compositeRisk: 0.8,
     incongruence: 0.09,
     riskLevel: 'MINIMAL',
-    text: "Patient states: 'No acute stressors or physical complaints reported.'"
+    summary: 'Steady & calm pattern reported',
+    explanation: 'Your self-reported answers and estimated signals reflect a steady, calm pattern today.',
+    text: "Patient states: 'No acute stressors or physical complaints reported.'",
+    cues: {
+      words: 'No acute stressors or physical complaints reported.',
+      speakingRhythm: 'Calm cadence and smooth phrasing with no vocal tremors.',
+      gentleExpressions: 'Comfortable, unstrained facial expression.'
+    }
   },
   {
     id: 'a931f804c8',
     timestamp: '9/23/2026, 09:44:12 PM',
+    dateIso: '2026-09-23T21:44:12.000Z',
     au4: 0.62,
     au15: 0.48,
     prosody: 0.45,
@@ -54,11 +74,19 @@ const INITIAL_RECORDS = [
     compositeRisk: 5.6,
     incongruence: 0.17,
     riskLevel: 'ELEVATED',
-    text: "Patient states: 'Work deadlines have been accumulating; struggling slightly with mid-day fatigue.'"
+    summary: 'It might help to talk with someone',
+    explanation: 'We noticed subtle signs of stress in your responses today. Remember that carrying a lot is hard, and gentle support is always available.',
+    text: "Patient states: 'Work deadlines have been accumulating; struggling slightly with mid-day fatigue.'",
+    cues: {
+      words: 'Work deadlines have been accumulating; struggling slightly with mid-day fatigue.',
+      speakingRhythm: 'Slightly hesitant pacing with pauses during response formulation.',
+      gentleExpressions: 'Mild furrowing of the brow detected during questions.'
+    }
   },
   {
     id: 'c4b1209ae1',
     timestamp: '9/23/2026, 08:30:19 PM',
+    dateIso: '2026-09-23T20:30:19.000Z',
     au4: 0.88,
     au15: 0.74,
     prosody: 0.72,
@@ -66,12 +94,36 @@ const INITIAL_RECORDS = [
     compositeRisk: 7.8,
     incongruence: 0.58,
     riskLevel: 'SEVERE',
-    text: "Patient states: 'Everything is fine. Really, I can handle it.' (High somatic masking divergence detected)"
+    summary: 'It might help to talk with someone',
+    explanation: 'We noticed signs of tension in your responses. Gentle, confidential support from a caring listener is available.',
+    text: "Patient states: 'Everything is fine. Really, I can handle it.'",
+    cues: {
+      words: 'Everything is fine. Really, I can handle it.',
+      speakingRhythm: 'Compressed pitch variations and rapid pauses.',
+      gentleExpressions: 'Elevated brow tension with lowered lip corners.'
+    }
   }
 ];
 
+const STORAGE_KEY_PATIENT_RECORDS = 'mindvision_patient_records';
+
+function loadStoredPatientRecords() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PATIENT_RECORDS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[MindVision] Failed to read stored patient records from localStorage:', err);
+  }
+  return INITIAL_RECORDS;
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home'); // Default to Patient Wellness Overview
+  const [activeTab, setActiveTab] = useState('home');
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem('mindvision_theme') || 'light';
@@ -84,7 +136,7 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [currentSession, setCurrentSession] = useState(DoctorAuthService.getCurrentSession());
   const [externalValues, setExternalValues] = useState(null);
-  const [records, setRecords] = useState(INITIAL_RECORDS);
+  const [records, setRecords] = useState(loadStoredPatientRecords);
   const [activeEscalation, setActiveEscalation] = useState(null);
 
   // High-Risk Escalation Modal State
@@ -144,12 +196,33 @@ export default function App() {
 
   // Add a new patient record
   const handleSavePatientRecord = (newRecord) => {
-    setRecords((prev) => [newRecord, ...prev]);
+    setRecords((prev) => {
+      const updated = [newRecord, ...prev];
+      try {
+        localStorage.setItem(STORAGE_KEY_PATIENT_RECORDS, JSON.stringify(updated));
+      } catch (err) {
+        console.warn('[MindVision] Failed to save patient records to localStorage:', err);
+      }
+      return updated;
+    });
 
     // If new record is severe, trigger active escalation queue
     if (newRecord.riskLevel === 'SEVERE') {
       setActiveEscalation(newRecord);
     }
+  };
+
+  const handleDeletePatientRecord = (recordId) => {
+    setRecords((prev) => {
+      const updated = prev.filter((r) => (r.id || r.timestamp) !== recordId);
+      try {
+        localStorage.setItem(STORAGE_KEY_PATIENT_RECORDS, JSON.stringify(updated));
+      } catch (err) {
+        console.warn('[MindVision] Failed to update patient records in localStorage:', err);
+      }
+      return updated;
+    });
+    showToast('Check-in record removed from this device.');
   };
 
   // Connect a doctor and launch active teletherapy room
@@ -232,84 +305,104 @@ export default function App() {
         setUserRole={setUserRole}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onEmergencyConnect={() => {
-          setHighRiskTelemetry({ compositeRisk: 7.8, incongruenceIndex: 0.58 });
-          setIsDoctorDirectoryOpen(true);
+          setActiveTab('crisis');
         }}
       />
 
       {/* Main Module Content */}
       <main className="main-content">
-        {activeTab === 'home' && (
-          <HomeOverview
-            setActiveTab={setActiveTab}
-            records={records}
-            userRole={userRole}
-            setUserRole={setUserRole}
-          />
-        )}
+        <ErrorBoundary
+          fallbackTitle="Something didn't load smoothly"
+          onReturn={() => setActiveTab('home')}
+        >
+          <PageTransition key={activeTab}>
+            {activeTab === 'home' && (
+              <HomeOverview
+                setActiveTab={setActiveTab}
+                records={records}
+                userRole={userRole}
+                setUserRole={setUserRole}
+                onConnectDoctor={handleConnectDoctor}
+                onShowToast={showToast}
+              />
+            )}
 
-        {activeTab === 'results' && (
-          userRole === 'PATIENT' ? (
-            <PatientHistoryView records={records} setActiveTab={setActiveTab} />
-          ) : (
-            <LongitudinalComparisonView currentRecord={records[0]} />
-          )
-        )}
+            {activeTab === 'results' && (
+              userRole === 'PATIENT' ? (
+                <PatientHistoryView
+                  records={records}
+                  setActiveTab={setActiveTab}
+                  onShowToast={showToast}
+                  onDeleteRecord={handleDeletePatientRecord}
+                />
+              ) : (
+                <LongitudinalComparisonView currentRecord={records[0]} />
+              )
+            )}
 
-        {activeTab === 'demo' && (
-          <LiveTelemetrySandbox
-            onLaunchSensor={() => setIsSensorOpen(true)}
-            onSavePatientRecord={handleSavePatientRecord}
-            onShowToast={showToast}
-            onTriggerHighRiskEscalation={handleTriggerHighRiskEscalation}
-            externalValues={externalValues}
-          />
-        )}
+            {activeTab === 'demo' && (
+              <LiveTelemetrySandbox
+                onLaunchSensor={() => setIsSensorOpen(true)}
+                onSavePatientRecord={handleSavePatientRecord}
+                onShowToast={showToast}
+                onTriggerHighRiskEscalation={handleTriggerHighRiskEscalation}
+                externalValues={externalValues}
+              />
+            )}
 
-        {activeTab === 'portal' && (
-          <ClinicianPortal
-            records={records}
-            activeEscalation={activeEscalation}
-            onAcceptEscalation={handleAcceptEscalation}
-            onDismissEscalation={handleDismissEscalation}
-            onTriggerTestEscalation={handleTriggerTestEscalation}
-            onShowToast={showToast}
-          />
-        )}
+            {activeTab === 'portal' && (
+              <ClinicianPortal
+                records={records}
+                activeEscalation={activeEscalation}
+                onAcceptEscalation={handleAcceptEscalation}
+                onDismissEscalation={handleDismissEscalation}
+                onTriggerTestEscalation={handleTriggerTestEscalation}
+                onShowToast={showToast}
+              />
+            )}
 
-        {activeTab === 'doctors' && (
-          <DoctorMarketplace
-            onConnectDoctor={handleConnectDoctor}
-            onShowToast={showToast}
-            currentTelemetrySnapshot={{
-              compositeRisk: 6.5,
-              incongruenceIndex: 0.42,
-              riskLevel: 'ELEVATED',
-              shapSummary: [
-                { name: 'AU04 Eyebrow Furrow', weight: 32 },
-                { name: 'AU15 Lip Depressor', weight: 26 },
-                { name: 'Acoustic Pitch Tremor', weight: 24 },
-                { name: 'Verbal Sentiment Stress', weight: 18 }
-              ],
-              soapNoteMarkdown: 'Patient presenting with elevated non-verbal stress parameters.'
-            }}
-          />
-        )}
+            {activeTab === 'doctors' && (
+              <DoctorMarketplace
+                onConnectDoctor={handleConnectDoctor}
+                onShowToast={showToast}
+                currentTelemetrySnapshot={{
+                  compositeRisk: 6.5,
+                  incongruenceIndex: 0.42,
+                  riskLevel: 'ELEVATED',
+                  shapSummary: [
+                    { name: 'AU04 Eyebrow Furrow', weight: 32 },
+                    { name: 'AU15 Lip Depressor', weight: 26 },
+                    { name: 'Acoustic Pitch Tremor', weight: 24 },
+                    { name: 'Verbal Sentiment Stress', weight: 18 }
+                  ],
+                  soapNoteMarkdown: 'Patient presenting with elevated non-verbal stress parameters.'
+                }}
+              />
+            )}
 
-        {activeTab === 'admin' && (
-          <AdminVerificationView onShowToast={showToast} />
-        )}
+            {activeTab === 'admin' && (
+              <AdminVerificationView onShowToast={showToast} />
+            )}
 
-        {activeTab === 'assessment' && (
-          <ScreeningAssessment
-            onCompleteAssessment={handleSavePatientRecord}
-            onShowToast={showToast}
-          />
-        )}
+            {activeTab === 'assessment' && (
+              <ScreeningAssessment
+                onCompleteAssessment={handleSavePatientRecord}
+                onShowToast={showToast}
+              />
+            )}
 
-        {(activeTab === 'docs' || activeTab === 'help') && (
-          <DocumentationView />
-        )}
+            {(activeTab === 'docs' || activeTab === 'help') && (
+              <DocumentationView />
+            )}
+
+            {activeTab === 'crisis' && (
+              <CrisisSupport
+                onReturn={() => setActiveTab('home')}
+                setActiveTab={setActiveTab}
+              />
+            )}
+          </PageTransition>
+        </ErrorBoundary>
       </main>
 
       {/* Doctor Registration & Role Login Modal */}

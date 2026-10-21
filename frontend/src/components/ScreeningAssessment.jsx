@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  CONVERSATION_QUESTION_BANK,
+  THEMATIC_QUESTION_BANK,
+  getInitialQuestion,
   determineNextQuestion,
   getConversationalAcknowledgement,
   getFriendlyProgress,
+  recordSessionCompleted,
   checkForCrisisTriggers
 } from '../utils/conversationEngine';
 import {
@@ -15,6 +17,33 @@ import {
   sanitizeTranscript
 } from '../utils/telemetryMath';
 import { ClinicalAuditService } from '../services/clinicalAuditService';
+import { TTSService } from '../services/ttsService';
+import {
+  IconSparkles,
+  IconShieldCheck,
+  IconLock,
+  IconMic,
+  IconVideo,
+  IconEar,
+  IconMessageSquare,
+  IconVolume2,
+  IconEdit,
+  IconHeartPulse,
+  IconLeaf,
+  IconChevronRight,
+  IconDownload,
+  IconRefreshCw,
+  IconCheck
+} from './Icons';
+import { generateCheckInPdf } from '../utils/pdfReportGenerator';
+import {
+  ProgressIndicator,
+  ConfirmDialog,
+  ReportPreview,
+  InteractiveButton,
+  IconButton,
+  Tooltip
+} from './primitives';
 
 // Workflow Stages
 const STAGE = {
@@ -25,6 +54,18 @@ const STAGE = {
   RESULTS: 'RESULTS'
 };
 
+// Explicit Interaction State Machine (8 distinct states)
+const INTERACTION_STATE = {
+  IDLE: 'IDLE',
+  REQUESTING_PERMISSION: 'REQUESTING_PERMISSION',
+  LISTENING: 'LISTENING',
+  PROCESSING: 'PROCESSING',
+  RESPONDING: 'RESPONDING',
+  PAUSED: 'PAUSED',
+  ERROR: 'ERROR',
+  COMPLETE: 'COMPLETE'
+};
+
 // Conversational Turn States
 const TURN_STATE = {
   SPEAKING: 'SPEAKING',       // MindVision is speaking the question
@@ -32,6 +73,7 @@ const TURN_STATE = {
   CONFIRMING: 'CONFIRMING',   // Reviewing recognized text
   TYPING: 'TYPING'            // Typing response manually
 };
+
 
 export default function ScreeningAssessment({ onCompleteAssessment, onShowToast }) {
   // Overall workflow stage
@@ -68,13 +110,16 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const audioAnimFrameRef = useRef(null);
+  const visualizerCanvasRef = useRef(null);
+  const visualizerAnimRef = useRef(null);
+  const micAudioStreamRef = useRef(null);
   const phaseJitterSamplesRef = useRef([]);
   const sessionJitterSamplesRef = useRef([]);
 
   // Conversation tracking
   const [turnState, setTurnState] = useState(TURN_STATE.SPEAKING);
-  const [currentQuestion, setCurrentQuestion] = useState(CONVERSATION_QUESTION_BANK.initial);
-  const [askedQuestionIds, setAskedQuestionIds] = useState(['q_initial']);
+  const [currentQuestion, setCurrentQuestion] = useState(() => getInitialQuestion());
+  const [askedQuestionIds, setAskedQuestionIds] = useState([]);
   const [questionCount, setQuestionCount] = useState(1);
   const [dialogHistory, setDialogHistory] = useState([]); // [{ id, prompt, answer, timestamp, phaseTelemetry }]
 
@@ -84,148 +129,255 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const [acknowledgementNote, setAcknowledgementNote] = useState('');
+  const [isTtsLoading, setIsTtsLoading] = useState(false);
 
   // Completed assessment results
   const [completedReport, setCompletedReport] = useState(null);
+  const [pdfStatus, setPdfStatus] = useState('idle'); // 'idle' | 'generating' | 'success' | 'error'
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const [, setAvailableVoices] = useState([]);
 
-  // 1. Text-To-Speech: onvoiceschanged Listener for WebKit/Blink voice population
+  // Production-Grade Explicit Interaction State Machine (8 States)
+  const [interactionState, setInteractionState] = useState(INTERACTION_STATE.IDLE);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
+  const [selectedReportForPreview, setSelectedReportForPreview] = useState(null);
+
+  // Restore unfinished check-in draft from sessionStorage if present
   useEffect(() => {
-    if ('speechSynthesis' in window) {
-      const handleVoicesChanged = () => {
-        const voices = window.speechSynthesis.getVoices();
-        if (voices && voices.length > 0) {
-          setAvailableVoices(voices);
+    try {
+      const rawDraft = sessionStorage.getItem('mindvision_active_checkin_draft');
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft);
+        if (draft && Array.isArray(draft.dialogHistory) && draft.dialogHistory.length > 0) {
+          setDialogHistory(draft.dialogHistory);
+          if (Array.isArray(draft.askedQuestionIds)) setAskedQuestionIds(draft.askedQuestionIds);
+          if (draft.questionCount) setQuestionCount(draft.questionCount);
+          if (draft.currentQuestion) setCurrentQuestion(draft.currentQuestion);
+          setCurrentStage(STAGE.CONVERSATION);
+          setInteractionState(INTERACTION_STATE.LISTENING);
+          setTurnState(TURN_STATE.TYPING);
         }
-      };
-
-      handleVoicesChanged();
-      window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
-    }
-
-    return () => {
-      stopAllMedia();
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.onvoiceschanged = null;
       }
-    };
+    } catch {
+      // Ignored
+    }
   }, []);
 
-  // 2. Select Highest Quality Natural Voice (Strict Priority Sequence)
-  const selectBestNaturalVoice = () => {
-    if (!('speechSynthesis' in window)) return null;
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices || voices.length === 0) return null;
+  // Sync draft responses to sessionStorage for resilience against accidental navigation
+  useEffect(() => {
+    if (currentStage === STAGE.CONVERSATION && dialogHistory.length > 0) {
+      try {
+        sessionStorage.setItem('mindvision_active_checkin_draft', JSON.stringify({
+          dialogHistory,
+          askedQuestionIds,
+          questionCount,
+          currentQuestion
+        }));
+      } catch {
+        // Ignored
+      }
+    } else if (currentStage === STAGE.RESULTS || currentStage === STAGE.INTRO) {
+      try {
+        sessionStorage.removeItem('mindvision_active_checkin_draft');
+      } catch {
+        // Ignored
+      }
+    }
+  }, [currentStage, dialogHistory, askedQuestionIds, questionCount, currentQuestion]);
 
-    // Filter for English voices in order of preference
-    const englishVoices = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('en'));
-    const candidatePool = englishVoices.length > 0 ? englishVoices : voices;
+  // 1. Text-To-Speech: Pre-cache prompts
+  useEffect(() => {
+    // Pre-cache known conversation prompts in background for zero-latency replay
+    const thematicPrompts = Object.values(THEMATIC_QUESTION_BANK)
+      .flat()
+      .map((q) => q?.prompt)
+      .filter(Boolean);
+    const commonPrompts = [
+      ...thematicPrompts,
+      "Thank you for taking this quiet moment for yourself. Preparing your gentle reflection summary now."
+    ];
+    TTSService.precache(commonPrompts);
+  }, []);
 
-    // Priority 1: Microsoft Aria Online (Natural) / Microsoft Jenny Online (Natural)
-    const msNatural = candidatePool.find((v) => {
-      const n = v.name.toLowerCase();
-      return n.includes('aria online (natural)') ||
-             n.includes('jenny online (natural)') ||
-             (n.includes('microsoft') && n.includes('aria')) ||
-             (n.includes('microsoft') && n.includes('jenny'));
-    });
-    if (msNatural) return msNatural;
-
-    // Priority 2: Google US English / Google UK English Female
-    const googleNatural = candidatePool.find((v) => {
-      const n = v.name.toLowerCase();
-      return n.includes('google us english') ||
-             n.includes('google uk english female');
-    });
-    if (googleNatural) return googleNatural;
-
-    const googleFallback = candidatePool.find((v) => {
-      const n = v.name.toLowerCase();
-      return n.includes('google uk english male') || n.includes('google');
-    });
-    if (googleFallback) return googleFallback;
-
-    // Priority 3: Samantha / Karen / Victoria (Apple Enhanced/Natural)
-    const appleEnhanced = candidatePool.find((v) => {
-      const n = v.name.toLowerCase();
-      return (n.includes('samantha') || n.includes('karen') || n.includes('victoria')) &&
-             (n.includes('enhanced') || n.includes('natural') || n.includes('premium'));
-    });
-    if (appleEnhanced) return appleEnhanced;
-
-    const appleStandard = candidatePool.find((v) => {
-      const n = v.name.toLowerCase();
-      return n.includes('samantha') || n.includes('karen') || n.includes('victoria');
-    });
-    if (appleStandard) return appleStandard;
-
-    // Priority 4: Any voice with 'Natural', 'Neural', or 'Enhanced' in its name
-    const genericNatural = candidatePool.find((v) => {
-      const n = v.name.toLowerCase();
-      return n.includes('natural') || n.includes('neural') || n.includes('enhanced');
-    });
-    if (genericNatural) return genericNatural;
-
-    // Default fallback
-    const defaultEn = candidatePool.find((v) => v.default && v.lang && v.lang.toLowerCase().startsWith('en'));
-    return defaultEn || candidatePool[0] || null;
-  };
-
-  // Speak question aloud using browser's SpeechSynthesis with calibrated natural voice
+  // Speak question aloud using Cloud Neural TTS pipeline with emergency local SpeechSynthesis fallback
   const speakQuestion = (textToSpeak, onFinish) => {
-    if (!('speechSynthesis' in window)) {
-      setTurnState(allowMic && speechSupported ? TURN_STATE.LISTENING : TURN_STATE.TYPING);
-      if (onFinish) onFinish();
+    TTSService.stop();
+
+    if (isMuted) {
+      setIsTtsLoading(false);
+      setTurnState(TURN_STATE.SPEAKING);
+      setInteractionState(INTERACTION_STATE.RESPONDING);
+      setTimeout(() => {
+        setIsTtsLoading(false);
+        if (allowMic && speechSupported) {
+          startSpeechRecognition();
+        } else {
+          setTurnState(TURN_STATE.TYPING);
+          setInteractionState(INTERACTION_STATE.LISTENING);
+        }
+        if (onFinish) onFinish();
+      }, 1000);
       return;
     }
 
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    TTSService.speak(
+      textToSpeak,
+      { rate: 0.92, pitch: '0%', style: 'chat' },
+      {
+        onLoading: (loading) => {
+          setIsTtsLoading(loading);
+        },
+        onStart: () => {
+          setIsTtsLoading(false);
+          setTurnState(TURN_STATE.SPEAKING);
+          setInteractionState(INTERACTION_STATE.RESPONDING);
+        },
+        onFinish: () => {
+          setIsTtsLoading(false);
+          if (allowMic && speechSupported) {
+            startSpeechRecognition();
+          } else {
+            setTurnState(TURN_STATE.TYPING);
+            setInteractionState(INTERACTION_STATE.LISTENING);
+          }
+          if (onFinish) onFinish();
+        },
+        onError: () => {
+          setIsTtsLoading(false);
+          if (allowMic && speechSupported) {
+            startSpeechRecognition();
+          } else {
+            setTurnState(TURN_STATE.TYPING);
+            setInteractionState(INTERACTION_STATE.LISTENING);
+          }
+          if (onFinish) onFinish();
+        }
+      }
+    );
+  };
 
-      // Assign prioritized natural voice
-      const bestVoice = selectBestNaturalVoice();
-      if (bestVoice) {
-        utterance.voice = bestVoice;
-        utterance.lang = bestVoice.lang || 'en-US';
-      } else {
-        utterance.lang = 'en-US';
+  // Web Audio API Canvas Visualizer Loop (Active strictly during TURN_STATE.LISTENING)
+  useEffect(() => {
+    if (turnState !== TURN_STATE.LISTENING) {
+      if (visualizerAnimRef.current) {
+        cancelAnimationFrame(visualizerAnimRef.current);
+        visualizerAnimRef.current = null;
+      }
+      return;
+    }
+
+    const canvas = visualizerCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Respect prefers-reduced-motion for all visualizer animations
+    const prefersReducedMotion = typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let phase = 0;
+
+    const renderVisualizer = () => {
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.width = canvas.offsetWidth * dpr;
+      const height = canvas.height = canvas.offsetHeight * dpr;
+      ctx.clearRect(0, 0, width, height);
+
+      // Reduced motion: serene static line and calm center focus dot
+      if (prefersReducedMotion) {
+        ctx.beginPath();
+        ctx.moveTo(10 * dpr, height / 2);
+        ctx.lineTo(width - 10 * dpr, height / 2);
+        ctx.strokeStyle = 'rgba(37, 124, 111, 0.4)';
+        ctx.lineWidth = 2 * dpr;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(width / 2, height / 2, 5 * dpr, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(37, 124, 111, 0.7)';
+        ctx.fill();
+        return;
       }
 
-      // Calibrated speech parameters: rate 0.93 (calm clinical pace), pitch 1.0, volume 1.0
-      utterance.rate = 0.93;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
+      // Sample real-time audio volume via AnalyserNode
+      let audioVolume = 0;
+      const analyser = analyserRef.current;
+      if (analyser) {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyser.getByteTimeDomainData(dataArray);
 
-      utterance.onstart = () => {
-        setTurnState(TURN_STATE.SPEAKING);
-      };
-
-      utterance.onend = () => {
-        if (allowMic && speechSupported) {
-          startSpeechRecognition();
-        } else {
-          setTurnState(TURN_STATE.TYPING);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const val = (dataArray[i] - 128) / 128.0;
+          sum += Math.abs(val);
         }
-        if (onFinish) onFinish();
-      };
+        audioVolume = sum / bufferLength;
+      }
 
-      utterance.onerror = () => {
-        if (allowMic && speechSupported) {
-          startSpeechRecognition();
+      phase += 0.05 + audioVolume * 0.12;
+      const centerY = height / 2;
+      const baseAmp = Math.max(5 * dpr, (audioVolume * 45 + 7) * dpr);
+
+      // Smooth Waveform with Gradient Stroke
+      const gradient = ctx.createLinearGradient(0, 0, width, 0);
+      gradient.addColorStop(0, 'rgba(37, 124, 111, 0.12)');
+      gradient.addColorStop(0.5, 'rgba(37, 124, 111, 0.9)');
+      gradient.addColorStop(1, 'rgba(46, 191, 165, 0.12)');
+
+      ctx.beginPath();
+      ctx.lineWidth = 2.5 * dpr;
+      ctx.strokeStyle = gradient;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const points = 36;
+      const sliceWidth = width / (points - 1);
+
+      for (let i = 0; i < points; i++) {
+        const norm = i / (points - 1);
+        const x = i * sliceWidth;
+        const envelope = Math.sin(norm * Math.PI);
+        const y = centerY + Math.sin(norm * 4 * Math.PI + phase) * baseAmp * envelope;
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
         } else {
-          setTurnState(TURN_STATE.TYPING);
+          const prevNorm = (i - 1) / (points - 1);
+          const prevX = (i - 1) * sliceWidth;
+          const prevY = centerY + Math.sin(prevNorm * 4 * Math.PI + phase) * baseAmp * Math.sin(prevNorm * Math.PI);
+          const cpX = (prevX + x) / 2;
+          const cpY = (prevY + y) / 2;
+          ctx.quadraticCurveTo(prevX, prevY, cpX, cpY);
         }
-        if (onFinish) onFinish();
-      };
+      }
+      ctx.stroke();
 
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setTurnState(allowMic && speechSupported ? TURN_STATE.LISTENING : TURN_STATE.TYPING);
-    }
-  };
+      // Pulsing radial center focus indicator
+      ctx.beginPath();
+      const dotRadius = Math.max(3.5, 4 + audioVolume * 10) * dpr;
+      ctx.arc(width / 2, centerY, dotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(37, 124, 111, 0.95)';
+      ctx.shadowColor = 'rgba(37, 124, 111, 0.45)';
+      ctx.shadowBlur = 8 * dpr;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      visualizerAnimRef.current = requestAnimationFrame(renderVisualizer);
+    };
+
+    visualizerAnimRef.current = requestAnimationFrame(renderVisualizer);
+
+    return () => {
+      if (visualizerAnimRef.current) {
+        cancelAnimationFrame(visualizerAnimRef.current);
+        visualizerAnimRef.current = null;
+      }
+    };
+  }, [turnState]);
 
   // Media & Tracker Cleanup
   const stopAllMedia = () => {
@@ -240,19 +392,36 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       cancelAnimationFrame(audioAnimFrameRef.current);
       audioAnimFrameRef.current = null;
     }
+    if (visualizerAnimRef.current) {
+      cancelAnimationFrame(visualizerAnimRef.current);
+      visualizerAnimRef.current = null;
+    }
+    if (micAudioStreamRef.current) {
+      micAudioStreamRef.current.getTracks().forEach((track) => track.stop());
+      micAudioStreamRef.current = null;
+    }
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
     }
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       try { audioContextRef.current.close(); } catch {}
+      audioContextRef.current = null;
     }
     if (faceMeshRef.current) {
       try { faceMeshRef.current.close(); } catch {}
       faceMeshRef.current = null;
     }
+    TTSService.stop();
     setCameraActive(false);
   };
+
+  // Teardown all media and audio on unmount
+  useEffect(() => {
+    return () => {
+      stopAllMedia();
+    };
+  }, []);
 
   // 3. Initialize MediaPipe FaceMesh via CDN and Anchor Real-Time Loop
   const initFaceMeshDetector = () => {
@@ -368,13 +537,21 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
   // Live Audio Prosody & Jitter Sampling via Web Audio API
   const initAudioProsodySampling = (audioStream) => {
     try {
+      if (!audioStream) return;
+      micAudioStreamRef.current = audioStream;
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
-      const audioCtx = new AudioCtx();
-      audioContextRef.current = audioCtx;
+      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+        audioContextRef.current = new AudioCtx();
+      }
+      const audioCtx = audioContextRef.current;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
       const source = audioCtx.createMediaStreamSource(audioStream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
       analyserRef.current = analyser;
 
@@ -429,6 +606,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       recognition.onstart = () => {
         setIsRecognizing(true);
         setTurnState(TURN_STATE.LISTENING);
+        setInteractionState(INTERACTION_STATE.LISTENING);
       };
 
       recognition.onresult = (event) => {
@@ -445,9 +623,11 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
           setSpeechSupported(false);
           setTurnState(TURN_STATE.TYPING);
+          setInteractionState(INTERACTION_STATE.ERROR);
           onShowToast?.('Microphone access was not permitted. Switching to typed response.');
         } else if (!recognizedText.trim()) {
           setTurnState(TURN_STATE.TYPING);
+          setInteractionState(INTERACTION_STATE.LISTENING);
         }
       };
 
@@ -470,6 +650,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
     } catch {
       setSpeechSupported(false);
       setTurnState(TURN_STATE.TYPING);
+      setInteractionState(INTERACTION_STATE.ERROR);
     }
   };
 
@@ -487,14 +668,17 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
 
   // Start check-in flow
   const handleStartCheckIn = () => {
+    setInteractionState(INTERACTION_STATE.REQUESTING_PERMISSION);
+    const initialQ = getInitialQuestion();
     setCurrentStage(STAGE.CONVERSATION);
     setDialogHistory([]);
-    setAskedQuestionIds(['q_initial']);
-    setCurrentQuestion(CONVERSATION_QUESTION_BANK.initial);
+    setAskedQuestionIds([initialQ.id]);
+    setCurrentQuestion(initialQ);
     setQuestionCount(1);
     setRecognizedText('');
     setTypedText('');
     setAcknowledgementNote('');
+    setIsPaused(false);
 
     // Clear telemetry accumulators
     phaseAu4SamplesRef.current = [];
@@ -509,8 +693,51 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
 
     // Speak initial question
     setTimeout(() => {
-      speakQuestion(CONVERSATION_QUESTION_BANK.initial.prompt);
+      speakQuestion(initialQ.prompt);
     }, 350);
+  };
+
+  // Pause / Resume Controls
+  const handlePauseCheckIn = () => {
+    setIsPaused(true);
+    setInteractionState(INTERACTION_STATE.PAUSED);
+    TTSService.stop();
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+    if (visualizerAnimRef.current) {
+      cancelAnimationFrame(visualizerAnimRef.current);
+      visualizerAnimRef.current = null;
+    }
+  };
+
+  const handleResumeCheckIn = () => {
+    setIsPaused(false);
+    setInteractionState(INTERACTION_STATE.RESPONDING);
+    speakQuestion(currentQuestion.prompt);
+  };
+
+  const handleDiscardPrompt = () => {
+    if (dialogHistory.length > 0) {
+      setIsDiscardDialogOpen(true);
+    } else {
+      handleConfirmDiscard();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setIsDiscardDialogOpen(false);
+    stopAllMedia();
+    TTSService.stop();
+    try {
+      sessionStorage.removeItem('mindvision_active_checkin_draft');
+    } catch {}
+    setDialogHistory([]);
+    setAskedQuestionIds([]);
+    setQuestionCount(1);
+    setCurrentStage(STAGE.INTRO);
+    setInteractionState(INTERACTION_STATE.IDLE);
+    onShowToast?.('Check-in session ended.');
   };
 
   // Confirm patient answer and progress adaptively
@@ -526,7 +753,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
 
     // Check for crisis triggers
     if (checkForCrisisTriggers(rawAnswer)) {
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      TTSService.stop();
       stopAllMedia();
       setCurrentStage(STAGE.CRISIS_ALERT);
       ClinicalAuditService.logEvent({
@@ -557,9 +784,10 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
     phaseAu15SamplesRef.current = [];
     phaseJitterSamplesRef.current = [];
 
-    // Record turn with verified phase telemetry
+    // Record turn with verified phase telemetry and theme
     const turnRecord = {
       id: currentQuestion.id,
+      theme: currentQuestion.theme || 'mood',
       prompt: currentQuestion.prompt,
       answer: rawAnswer,
       sanitizedAnswer: sanitizedAnswer,
@@ -579,10 +807,10 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
     const updatedAsked = [...askedQuestionIds, currentQuestion.id];
     setAskedQuestionIds(updatedAsked);
 
-    const nextQ = (questionCount < 4) ? determineNextQuestion(rawAnswer, updatedAsked) : null;
+    const nextQ = determineNextQuestion(rawAnswer, updatedAsked, questionCount, 4);
 
     if (nextQ) {
-      const ack = getConversationalAcknowledgement(questionCount);
+      const ack = getConversationalAcknowledgement(rawAnswer, questionCount);
       setAcknowledgementNote(ack);
       setCurrentQuestion(nextQ);
       setQuestionCount((prev) => prev + 1);
@@ -601,21 +829,10 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
     setCurrentStage(STAGE.SYNTHESIZING);
     stopAllMedia();
 
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const wrapUtterance = new SpeechSynthesisUtterance("Thank you for completing your check-in. Synthesizing your results now.");
-      const bestVoice = selectBestNaturalVoice();
-      if (bestVoice) {
-        wrapUtterance.voice = bestVoice;
-        wrapUtterance.lang = bestVoice.lang || 'en-US';
-      } else {
-        wrapUtterance.lang = 'en-US';
-      }
-      wrapUtterance.rate = 0.93;
-      wrapUtterance.pitch = 1.0;
-      wrapUtterance.volume = 1.0;
-      window.speechSynthesis.speak(wrapUtterance);
-    }
+    TTSService.speak(
+      "Thank you for taking this quiet moment for yourself. Preparing your gentle reflection summary now.",
+      { rate: 0.92, pitch: '0%', style: 'chat' }
+    );
 
     setTimeout(() => {
       // 1. Filter out garbage placeholder transcriptions and aggregate valid patient answers
@@ -653,10 +870,17 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       const clinicalNarrative = generateClinicalNarrative(metrics);
       const soapNote = synthesizeSoapNote(fullValidText || history.map((h) => h.answer).join(' '), metrics);
 
+      const isElevatedRisk = metrics.riskLevel === 'ELEVATED' || metrics.riskLevel === 'SEVERE' || (metrics.compositeRisk >= 5.0);
+      const reportHeadline = isElevatedRisk ? "It might help to talk with someone" : "Steady & calm pattern reported";
+      const reportExplanation = isElevatedRisk
+        ? "We noticed subtle signs of stress in your responses today. Remember that carrying a lot is hard, and gentle support is always available."
+        : "Your self-reported answers and estimated signals reflect a calm, steady pattern today. Nice job taking time out of your day to pause and check in with yourself.";
+
       const reportId = `scr_${Math.random().toString(36).substring(2, 9)}`;
       const finalReport = {
         id: reportId,
         timestamp: new Date().toLocaleString(),
+        dateIso: new Date().toISOString(),
         au4: metrics.au4,
         au15: metrics.au15,
         prosody: metrics.acousticJitter,
@@ -664,13 +888,28 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
         compositeRisk: metrics.compositeRisk,
         incongruence: metrics.incongruenceIndex,
         riskLevel: metrics.riskLevel,
+        clinicalNarrative,
+        soapNote,
         text: fullValidText || history.map((h) => h.answer).join(' '),
         dialogHistory: history,
         mode: 'CONVERSATIONAL_VOICE',
         hasFacialTelemetry: hasFacial,
         hasAudioTelemetry: hasAudio,
-        signalWarnings: metrics.warnings || []
+        signalWarnings: metrics.warnings || [],
+        summary: reportHeadline,
+        explanation: reportExplanation,
+        cues: {
+          words: fullValidText || (history && history.length > 0 ? history.map((h) => h.answer).join(' ') : 'Shared reflections on daily routine, energy, and sleep.'),
+          speakingRhythm: hasAudio ? 'Steady, calm pacing with natural breathing intervals.' : 'Even conversational pacing observed in reflections.',
+          gentleExpressions: hasFacial ? 'Relaxed facial muscle tone and comfortable focus observed.' : 'Self-guided reflection completed with relaxed focus.'
+        }
       };
+
+      try {
+        sessionStorage.removeItem('mindvision_active_checkin_draft');
+      } catch {}
+
+      setInteractionState(INTERACTION_STATE.COMPLETE);
 
       ClinicalAuditService.logEvent({
         eventType: 'SCREENING_COMPLETED',
@@ -681,6 +920,12 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
         status: 'COMPLETED',
         details: `Intake protocol finished. Facial active: ${hasFacial}, Audio active: ${hasAudio}. Warnings: ${metrics.warnings.join('; ') || 'None'}.`
       });
+
+      // Persist asked question variants to local memory so repeat sessions rotate
+      recordSessionCompleted(
+        history.map((h) => h.id).filter(Boolean),
+        history.map((h) => h.theme || 'general').filter(Boolean)
+      );
 
       setCompletedReport(finalReport);
       setCurrentStage(STAGE.RESULTS);
@@ -693,6 +938,23 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
     speakQuestion(currentQuestion.prompt);
   };
 
+  const handleDownloadPdf = async (reportToDownload = completedReport) => {
+    if (!reportToDownload || pdfStatus === 'generating') return;
+    setPdfStatus('generating');
+    try {
+      const result = await generateCheckInPdf(reportToDownload, { save: true });
+      setPdfStatus('success');
+      onShowToast?.(`Wellness report downloaded: ${result.filename}`);
+      setTimeout(() => {
+        setPdfStatus('idle');
+      }, 3500);
+    } catch (err) {
+      console.error('[MindVision] Failed to generate report PDF:', err);
+      setPdfStatus('error');
+      onShowToast?.("We couldn't generate your report — please try again");
+    }
+  };
+
   return (
     <div className="assessment-wrapper">
       
@@ -700,11 +962,14 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       {/* 1. INTRO / WELCOME STAGE */}
       {/* ============================================================== */}
       {currentStage === STAGE.INTRO && (
-        <div className="patient-hero-card" style={{ maxWidth: '680px', margin: '1rem auto' }}>
+        <div className="patient-hero-card" style={{ width: '100%', margin: '0 0 2rem 0' }}>
           <div className="patient-hero-kicker">
-            <span>🌿 Gentle Check-in</span>
+            <span className="badge-hero-primary">
+              <IconSparkles size={14} />
+              <span>Gentle Check-in</span>
+            </span>
             <span style={{ color: 'var(--text-muted)' }}>•</span>
-            <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.78rem' }}>2–3 Minutes</span>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.8rem' }}>2–3 Minutes</span>
           </div>
 
           <h1 className="patient-hero-title" style={{ fontSize: '1.9rem', marginBottom: '0.6rem' }}>
@@ -726,8 +991,8 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
             flexDirection: 'column',
             gap: '0.85rem'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-              <span>🔒</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+              <IconLock size={15} style={{ color: 'var(--color-primary)' }} />
               <span>Your privacy comes first</span>
             </div>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 }}>
@@ -759,6 +1024,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <button
+              id="btn-intro-type-instead"
               type="button"
               onClick={() => {
                 setAllowMic(false);
@@ -778,6 +1044,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
             </button>
 
             <button
+              id="btn-intro-start-checkin"
               type="button"
               className="btn-patient-primary"
               onClick={handleStartCheckIn}
@@ -795,21 +1062,60 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       {/* 2. CONVERSATION STAGE (CALM, REASSURING VOICE & TEXT FLOW) */}
       {/* ============================================================== */}
       {currentStage === STAGE.CONVERSATION && (
-        <div className="patient-view-shell" style={{ maxWidth: '740px', padding: '0.5rem 1rem 2rem 1rem' }}>
+        <div className="patient-view-shell" style={{ width: '100%', padding: '0.5rem 0 2rem 0' }}>
           
-          {/* Simple, Non-Clinical Progress Bar */}
-          <div className="patient-progress-container">
-            <div className="patient-progress-header">
-              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                Question {questionCount} of 4
-              </span>
-              <span>{getFriendlyProgress(questionCount)}</span>
-            </div>
-            <div className="patient-progress-track">
-              <div
-                className="patient-progress-fill"
-                style={{ width: `${Math.min(100, (questionCount / 4) * 100)}%` }}
+          {/* Conversational Progress & Real-Time Control Bar */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1rem',
+            marginBottom: '1rem',
+            flexWrap: 'wrap',
+            background: 'var(--card-bg)',
+            padding: '0.85rem 1.25rem',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-subtle)'
+          }}>
+            <div style={{ flex: '1 1 240px' }}>
+              <ProgressIndicator
+                value={questionCount}
+                max={4}
+                label={getFriendlyProgress(questionCount, currentQuestion?.theme)}
               />
+            </div>
+
+            {/* Session Action Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <InteractiveButton
+                variant={isPaused ? "primary" : "secondary"}
+                size="sm"
+                onClick={isPaused ? handleResumeCheckIn : handlePauseCheckIn}
+                aria-label={isPaused ? "Resume check-in" : "Pause check-in"}
+              >
+                {isPaused ? 'Resume' : 'Pause'}
+              </InteractiveButton>
+
+              <Tooltip text={isMuted ? "Unmute voice prompts" : "Mute voice prompts"}>
+                <IconButton
+                  icon={isMuted ? <IconVolume2 size={15} style={{ opacity: 0.4 }} /> : <IconVolume2 size={15} />}
+                  label={isMuted ? "Unmute voice prompts" : "Mute voice prompts"}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsMuted(!isMuted)}
+                />
+              </Tooltip>
+
+              <InteractiveButton
+                variant="ghost"
+                size="sm"
+                onClick={handleDiscardPrompt}
+                aria-label="End check-in session"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Exit
+              </InteractiveButton>
             </div>
           </div>
 
@@ -829,43 +1135,100 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
           >
             {/* Calm Breathing & Listening Orb */}
             <div
-              className={`calm-breathing-orb ${turnState === TURN_STATE.LISTENING ? 'listening' : ''}`}
-              title={turnState === TURN_STATE.LISTENING ? 'Listening to your voice...' : 'MindVision Check-in'}
+              className={`calm-breathing-orb ${interactionState === INTERACTION_STATE.LISTENING ? 'listening' : ''}`}
+              title={interactionState === INTERACTION_STATE.LISTENING ? 'Listening to your voice...' : 'MindVision Check-in'}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <span style={{ fontSize: '2rem' }}>
-                {turnState === TURN_STATE.SPEAKING ? '🌿' : turnState === TURN_STATE.LISTENING ? '🎙️' : '💬'}
-              </span>
+              {interactionState === INTERACTION_STATE.RESPONDING ? (
+                <IconSparkles size={32} style={{ color: 'var(--color-primary)' }} />
+              ) : interactionState === INTERACTION_STATE.LISTENING ? (
+                <IconMic size={32} style={{ color: 'var(--color-primary)' }} />
+              ) : (
+                <IconMessageSquare size={30} style={{ color: 'var(--color-primary)' }} />
+              )}
             </div>
 
-            {/* Turn State Indicator (Human & Plain) */}
+            {/* Explicit Interaction State Machine Badge */}
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.35rem 0.95rem',
+              gap: '0.45rem',
+              padding: '0.3rem 0.85rem',
               borderRadius: 'var(--radius-pill)',
-              backgroundColor: turnState === TURN_STATE.LISTENING ? 'var(--accent-teal-soft-bg)' : 'var(--bg-secondary)',
-              color: turnState === TURN_STATE.LISTENING ? 'var(--accent-teal)' : 'var(--text-secondary)',
-              fontSize: '0.84rem',
+              backgroundColor: interactionState === INTERACTION_STATE.PAUSED
+                ? 'var(--bg-secondary)'
+                : interactionState === INTERACTION_STATE.ERROR
+                ? 'var(--status-elevated-bg)'
+                : 'var(--accent-teal-subtle)',
+              color: interactionState === INTERACTION_STATE.ERROR
+                ? 'var(--status-elevated-text)'
+                : 'var(--accent-teal)',
+              fontSize: '0.82rem',
               fontWeight: 600,
               marginTop: '1.25rem',
-              marginBottom: '1rem'
+              marginBottom: '0.5rem',
+              border: '1px solid var(--border-color)'
             }}>
-              {turnState === TURN_STATE.SPEAKING && <span>Listening to question...</span>}
-              {turnState === TURN_STATE.LISTENING && <span>Listening... speak naturally whenever you're ready</span>}
-              {turnState === TURN_STATE.CONFIRMING && <span>Reviewing your response</span>}
-              {turnState === TURN_STATE.TYPING && <span>Take your time typing below</span>}
+              <span style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                backgroundColor: interactionState === INTERACTION_STATE.PAUSED
+                  ? 'var(--text-muted)'
+                  : interactionState === INTERACTION_STATE.ERROR
+                  ? 'var(--status-elevated-dot)'
+                  : 'var(--accent-teal)'
+              }} />
+              <span>
+                {interactionState === INTERACTION_STATE.PAUSED && 'Check-in paused'}
+                {interactionState === INTERACTION_STATE.RESPONDING && (isTtsLoading ? 'Preparing audio...' : 'MindVision is speaking...')}
+                {interactionState === INTERACTION_STATE.LISTENING && 'Listening... speak naturally'}
+                {interactionState === INTERACTION_STATE.PROCESSING && 'Reflecting on your response...'}
+                {interactionState === INTERACTION_STATE.ERROR && 'Microphone offline — typing mode active'}
+                {interactionState === INTERACTION_STATE.REQUESTING_PERMISSION && 'Requesting permissions...'}
+                {interactionState === INTERACTION_STATE.IDLE && 'Ready to begin'}
+              </span>
             </div>
 
-            {/* Ambient Waveform during Listening */}
+            {/* Ambient Status Badges (Subtle, Genuine Only) */}
+            <div className="ambient-badges-row" aria-label="Ambient telemetry indicators">
+              {isTtsLoading && (
+                <div className="ambient-status-badge badge-listening">
+                  <span className="ambient-badge-dot" style={{ backgroundColor: 'var(--accent-teal)' }} />
+                  <IconSparkles size={12} />
+                  <span>Neural voice streaming...</span>
+                </div>
+              )}
+              {allowMic && !isPaused && (
+                <div className={`ambient-status-badge ${interactionState === INTERACTION_STATE.LISTENING ? 'badge-listening' : ''}`}>
+                  <span className="ambient-badge-dot" />
+                  <IconMic size={12} />
+                  <span>Vocal prosody active</span>
+                </div>
+              )}
+              {allowCamera && cameraActive && liveFacialTelemetry.hasFace && (
+                <div className="ambient-status-badge">
+                  <span className="ambient-badge-dot" style={{ backgroundColor: 'var(--status-minimal-dot)' }} />
+                  <IconVideo size={12} />
+                  <span>Facial expression tracking online</span>
+                </div>
+              )}
+              {turnState === TURN_STATE.LISTENING && (
+                <div className="ambient-status-badge badge-listening">
+                  <span className="ambient-badge-dot" />
+                  <IconEar size={12} />
+                  <span>Listening closely...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Real-Time Web Audio API Canvas Visualizer (Active during LISTENING only) */}
             {turnState === TURN_STATE.LISTENING && (
-              <div className="calm-waveform-container" aria-label="Listening audio animation">
-                <div className="calm-waveform-bar" />
-                <div className="calm-waveform-bar" />
-                <div className="calm-waveform-bar" />
-                <div className="calm-waveform-bar" />
-                <div className="calm-waveform-bar" />
-              </div>
+              <canvas
+                ref={visualizerCanvasRef}
+                className="screening-canvas-visualizer"
+                aria-label="Real-time voice waveform"
+              />
             )}
 
             {/* Acknowledgement Note if present */}
@@ -905,12 +1268,26 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                   {recognizedText ? (
                     <span style={{ fontWeight: 500 }}>"{recognizedText}"</span>
                   ) : (
-                    <span style={{ fontStyle: 'italic' }}>We're listening... take your time.</span>
+                    <span style={{ fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                      {isRecognizing && (
+                        <span
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--accent-teal)',
+                            display: 'inline-block'
+                          }}
+                        />
+                      )}
+                      <span>We're listening... take your time.</span>
+                    </span>
                   )}
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '0.85rem', marginTop: '1.25rem' }}>
                   <button
+                    id="btn-done-speaking"
                     type="button"
                     className="btn-patient-primary"
                     onClick={stopSpeechRecognition}
@@ -919,6 +1296,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                     Done Speaking
                   </button>
                   <button
+                    id="btn-switch-to-typing"
                     type="button"
                     onClick={() => {
                       if (recognitionRef.current) {
@@ -980,7 +1358,10 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                         cursor: 'pointer'
                       }}
                     >
-                      ↻ Try speaking again
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <IconMic size={13} />
+                        <span>Try speaking again</span>
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -995,7 +1376,10 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                         cursor: 'pointer'
                       }}
                     >
-                      ✏️ Edit text
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <IconEdit size={13} />
+                        <span>Edit text</span>
+                      </span>
                     </button>
                   </div>
 
@@ -1006,7 +1390,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                     style={{ fontSize: '0.9rem', padding: '0.65rem 1.4rem' }}
                   >
                     <span>Confirm</span>
-                    <span>›</span>
+                    <IconChevronRight size={15} />
                   </button>
                 </div>
               </div>
@@ -1016,6 +1400,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
             {turnState === TURN_STATE.TYPING && (
               <div style={{ width: '100%', maxWidth: '560px', margin: '0.5rem 0 1.25rem 0', textAlign: 'left' }}>
                 <textarea
+                  id="input-typed-response"
                   className="clinical-textarea"
                   rows={4}
                   value={typedText}
@@ -1050,11 +1435,15 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                         cursor: 'pointer'
                       }}
                     >
-                      🎙️ Speak instead
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <IconMic size={14} />
+                        <span>Speak instead</span>
+                      </span>
                     </button>
                   ) : <span />}
 
                   <button
+                    id="btn-submit-typed"
                     type="button"
                     className="btn-patient-primary"
                     disabled={!typedText.trim()}
@@ -1062,7 +1451,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                     style={{ fontSize: '0.9rem', padding: '0.65rem 1.4rem' }}
                   >
                     <span>Continue</span>
-                    <span>›</span>
+                    <IconChevronRight size={15} />
                   </button>
                 </div>
               </div>
@@ -1089,10 +1478,10 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.35rem'
+                  gap: '0.4rem'
                 }}
               >
-                <span>🔊</span>
+                <IconVolume2 size={15} />
                 <span>Repeat question</span>
               </button>
 
@@ -1192,8 +1581,8 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       {currentStage === STAGE.CRISIS_ALERT && (
         <div className="workstation-panel" style={{ maxWidth: '680px', margin: '2rem auto', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
           <div className="panel-header" style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '1rem 1.25rem' }}>
-            <div className="panel-title-group">
-              <span style={{ fontSize: '1.5rem' }}>🛡️</span>
+            <div className="panel-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <IconShieldCheck size={26} style={{ color: '#ef4444' }} />
               <div>
                 <h2 style={{ fontSize: '1.15rem', color: '#ef4444', margin: 0 }}>
                   Immediate Support &amp; Safety Resources
@@ -1277,13 +1666,12 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       )}
 
       {/* ============================================================== */}
-      {/* ============================================================== */}
       {/* 4. SYNTHESIZING STAGE */}
       {/* ============================================================== */}
       {currentStage === STAGE.SYNTHESIZING && (
         <div style={{ maxWidth: '520px', margin: '4rem auto', textAlign: 'center', padding: '2rem' }}>
-          <div className="calm-breathing-orb listening" style={{ width: '80px', height: '80px', margin: '0 auto 1.5rem auto' }}>
-            <span style={{ fontSize: '1.8rem' }}>🌿</span>
+          <div className="calm-breathing-orb listening" style={{ width: '80px', height: '80px', margin: '0 auto 1.5rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IconSparkles size={32} style={{ color: 'var(--color-primary)' }} />
           </div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
             Taking a moment to reflect...
@@ -1305,7 +1693,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
           : "Your self-reported answers and estimated signals reflect a calm, steady pattern today. Nice job taking time out of your day to pause and check in with yourself.";
 
         return (
-          <div className="patient-view-shell" style={{ maxWidth: '720px' }}>
+          <div className="patient-view-shell" style={{ width: '100%' }}>
             
             {/* Main Result Card */}
             <div className="patient-result-card">
@@ -1313,10 +1701,14 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                 className="patient-result-icon-wrapper"
                 style={{
                   backgroundColor: isElevated ? 'var(--status-elevated-bg)' : 'var(--status-minimal-bg)',
-                  color: isElevated ? 'var(--status-elevated-text)' : 'var(--status-minimal-text)'
+                  color: isElevated ? 'var(--status-elevated-text)' : 'var(--status-minimal-text)',
+                  border: `1px solid ${isElevated ? 'var(--status-elevated-border)' : 'var(--status-minimal-border)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
-                <span>{isElevated ? '🧡' : '🌱'}</span>
+                {isElevated ? <IconHeartPulse size={28} /> : <IconLeaf size={28} />}
               </div>
 
               <div style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)' }}>
@@ -1347,6 +1739,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                   </button>
                 ) : (
                   <button
+                    id="btn-see-history"
                     type="button"
                     className="btn-patient-primary"
                     onClick={() => {
@@ -1358,6 +1751,66 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
                     <span>›</span>
                   </button>
                 )}
+
+                {/* Preview Report Modal Trigger */}
+                <InteractiveButton
+                  id="btn-preview-report"
+                  variant="secondary"
+                  onClick={() => setSelectedReportForPreview(completedReport)}
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  aria-label="Preview Wellness Check-in Report"
+                >
+                  <span>Preview Report</span>
+                </InteractiveButton>
+
+                {/* Secondary Action: Download Report PDF */}
+                <button
+                  id="btn-download-pdf"
+                  type="button"
+                  className="btn-patient-secondary"
+                  onClick={() => handleDownloadPdf(completedReport)}
+                  disabled={pdfStatus === 'generating'}
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  aria-label="Download Wellness Check-in Report PDF"
+                >
+                  {pdfStatus === 'generating' ? (
+                    <>
+                      <IconRefreshCw size={16} className="spinning" />
+                      <span>Preparing report...</span>
+                    </>
+                  ) : pdfStatus === 'success' ? (
+                    <>
+                      <IconCheck size={16} style={{ color: 'var(--accent-teal)' }} />
+                      <span>Report Downloaded!</span>
+                    </>
+                  ) : pdfStatus === 'error' ? (
+                    <>
+                      <IconRefreshCw size={16} style={{ color: '#ef4444' }} />
+                      <span>Failed to download. Tap to retry</span>
+                    </>
+                  ) : (
+                    <>
+                      <IconDownload size={16} />
+                      <span>Download Report (.pdf)</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Local Storage Privacy Note */}
+                <div
+                  style={{
+                    fontSize: '0.78rem',
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    textAlign: 'center',
+                    lineHeight: 1.4
+                  }}
+                >
+                  <IconShieldCheck size={14} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                  <span>Stored locally on this device. Never uploaded to a server without your consent.</span>
+                </div>
 
                 <button
                   type="button"
@@ -1450,6 +1903,27 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
         );
       })()}
 
+      {/* Confirm Discard Dialog */}
+      <ConfirmDialog
+        isOpen={isDiscardDialogOpen}
+        title="Discard current check-in?"
+        description="You have answers recorded in this check-in session. If you leave now, your current answers will be discarded."
+        confirmLabel="Discard Check-in"
+        cancelLabel="Continue Check-in"
+        variant="danger"
+        onConfirm={handleConfirmDiscard}
+        onCancel={() => setIsDiscardDialogOpen(false)}
+      />
+
+      {/* Report Preview Modal */}
+      <ReportPreview
+        isOpen={Boolean(selectedReportForPreview)}
+        report={selectedReportForPreview}
+        onClose={() => setSelectedReportForPreview(null)}
+        onDownload={(rpt) => handleDownloadPdf(rpt)}
+      />
+
     </div>
   );
 }
+

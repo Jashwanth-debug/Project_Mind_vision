@@ -54,7 +54,7 @@ export default function ClinicianPortal({
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [onShowToast]);
 
   const isOnCall = activeDoctor ? (activeDoctor.availabilityStatus === 'ONLINE' || activeDoctor.isAvailable) : true;
   const customRate = activeDoctor ? (activeDoctor.ratePerMinute !== undefined ? activeDoctor.ratePerMinute : 12) : 12;

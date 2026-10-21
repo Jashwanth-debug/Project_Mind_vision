@@ -33,6 +33,12 @@ export default function DoctorDirectoryModal({
         (languageFilter === 'EN' && l.toLowerCase().includes('english'))
       ));
 
+    const query = searchQuery ? searchQuery.trim().toLowerCase() : '';
+    const matchesQuery = !query ||
+      doc.name.toLowerCase().includes(query) ||
+      (doc.title && doc.title.toLowerCase().includes(query)) ||
+      (doc.institution && doc.institution.toLowerCase().includes(query));
+
     return matchesRate && matchesSpecialty && matchesLanguage && matchesQuery;
   });
 

@@ -1,0 +1,517 @@
+/* ==========================================================================
+   MindVision Clinical AI - Reusable UI Primitives Design System
+   WCAG AA Compliant, High-Tactile, Reduced-Motion Aware
+   ========================================================================== */
+/* Screen Reader Only Utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 1. Interactive Button */
+.mv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-decoration: none;
+  min-height: var(--touch-target-min, 44px);
+  min-width: var(--touch-target-min, 44px);
+  padding: 0 1.25rem;
+  font-size: 0.92rem;
+  line-height: 1;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.mv-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(-1px);
+}
+
+.mv-btn:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(1px) scale(0.98);
+}
+
+.mv-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mv-btn:disabled,
+.mv-btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Button Variants */
+.mv-btn-primary {
+  background-color: var(--accent-teal);
+  color: #ffffff;
+  border-color: var(--accent-teal);
+  box-shadow: 0 2px 8px rgba(37, 124, 111, 0.25);
+}
+
+.mv-btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-teal-hover);
+  border-color: var(--accent-teal-hover);
+  box-shadow: 0 4px 12px rgba(37, 124, 111, 0.35);
+}
+
+.mv-btn-secondary {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-subtle);
+}
+
+.mv-btn-secondary:hover:not(:disabled) {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-hover);
+}
+
+.mv-btn-outline {
+  background-color: transparent;
+  color: var(--accent-teal);
+  border-color: var(--accent-teal);
+}
+
+.mv-btn-outline:hover:not(:disabled) {
+  background-color: var(--accent-teal-soft-bg);
+}
+
+.mv-btn-ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+
+.mv-btn-ghost:hover:not(:disabled) {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.mv-btn-danger {
+  background-color: var(--status-severe-dot);
+  color: #ffffff;
+  border-color: var(--status-severe-dot);
+}
+
+.mv-btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.mv-btn-danger:focus-visible {
+  box-shadow: var(--focus-ring-danger);
+}
+
+/* Button Sizes */
+.mv-btn-sm {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 0.85rem;
+  font-size: 0.82rem;
+}
+
+.mv-btn-lg {
+  min-height: 50px;
+  padding: 0 1.75rem;
+  font-size: 1.02rem;
+}
+
+/* 2. Icon Button */
+.mv-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min, 44px);
+  height: var(--touch-target-min, 44px);
+  border-radius: var(--radius-pill);
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+.mv-icon-btn:hover:not(:disabled) {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.mv-icon-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.95);
+}
+
+.mv-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mv-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 3. Accessible Tooltip */
+.mv-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.mv-tooltip-content {
+  position: absolute;
+  z-index: 1200;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: var(--neutral-900);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.mv-tooltip-top {
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, -4px);
+  margin-bottom: 6px;
+}
+
+.mv-tooltip-bottom {
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 4px);
+  margin-top: 6px;
+}
+
+.mv-tooltip-wrapper:hover .mv-tooltip-content,
+.mv-tooltip-wrapper:focus-within .mv-tooltip-content {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* 4. Accessible Toast */
+.mv-toast-region {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: calc(100vw - 3rem);
+}
+
+.mv-toast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--card-bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1.15rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 0.88rem;
+  animation: mv-toast-in var(--motion-normal) var(--motion-ease-out);
+}
+
+@keyframes mv-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 5. Accessible Drawer / Sheet */
+.mv-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 1400;
+  display: flex;
+  justify-content: flex-end;
+  animation: mv-fade-in var(--motion-normal) var(--motion-ease-out);
+}
+
+.mv-drawer-panel {
+  width: 100%;
+  max-width: 440px;
+  height: 100%;
+  background: var(--card-bg);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  animation: mv-drawer-slide-in var(--motion-slow) var(--motion-ease-out);
+  overflow-y: auto;
+}
+
+@keyframes mv-drawer-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* 6. Accessible Modal / Dialog */
+.mv-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: mv-fade-in var(--motion-fast) var(--motion-ease-out);
+}
+
+.mv-modal-dialog {
+  width: 100%;
+  max-width: 540px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: mv-modal-pop var(--motion-normal) var(--motion-ease-out);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+@keyframes mv-modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes mv-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 7. Accessible Accordion */
+.mv-accordion-item {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mv-accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.96rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  min-height: var(--touch-target-min, 44px);
+  transition: color var(--motion-fast) var(--motion-ease-out);
+}
+
+.mv-accordion-header:hover {
+  color: var(--accent-teal);
+}
+
+.mv-accordion-chevron {
+  transition: transform var(--motion-normal) var(--motion-ease-out);
+}
+
+.mv-accordion-header[aria-expanded="true"] .mv-accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.mv-accordion-content {
+  overflow: hidden;
+  transition:
+    max-height var(--motion-slow) var(--motion-ease-out),
+    opacity var(--motion-slow) var(--motion-ease-out);
+}
+
+/* 8. Layout-Matched Skeleton */
+.mv-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    var(--border-color) 50%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 200% 100%;
+  animation: mv-shimmer 1.8s infinite;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
+@keyframes mv-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.mv-skeleton-circle {
+  border-radius: 50%;
+}
+
+/* 9. Empty State & Error State */
+.mv-empty-state,
+.mv-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background: var(--card-bg);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-xl);
+  max-width: 520px;
+  margin: 1.5rem auto;
+}
+
+.mv-empty-icon,
+.mv-error-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.mv-empty-icon {
+  background: var(--accent-teal-soft-bg);
+  color: var(--accent-teal);
+}
+
+.mv-error-icon {
+  background: var(--status-severe-bg);
+  color: var(--status-severe-text);
+}
+
+.mv-state-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.4rem 0;
+}
+
+.mv-state-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 1.25rem 0;
+  max-width: 400px;
+}
+
+/* 10. Honest Progress Indicator */
+.mv-progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  position: relative;
+}
+
+.mv-progress-bar {
+  height: 100%;
+  background: var(--accent-teal);
+  border-radius: var(--radius-pill);
+  transition: width var(--motion-slow) var(--motion-ease-out);
+}
+
+/* 11. Page Transition Container */
+.mv-page-transition {
+  animation: mv-page-enter var(--motion-normal) var(--motion-ease-out);
+  will-change: transform, opacity;
+}
+
+@keyframes mv-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 12. Reduced Motion Overrides */
+@media (prefers-reduced-motion: reduce) {
+  .mv-btn,
+  .mv-icon-btn,
+  .mv-tooltip-content,
+  .mv-toast,
+  .mv-drawer-backdrop,
+  .mv-drawer-panel,
+  .mv-modal-backdrop,
+  .mv-modal-dialog,
+  .mv-accordion-header,
+  .mv-accordion-chevron,
+  .mv-accordion-content,
+  .mv-progress-bar,
+  .mv-page-transition {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+  .mv-skeleton {
+    animation: none !important;
+    background: var(--bg-secondary) !important;
+  }
+}

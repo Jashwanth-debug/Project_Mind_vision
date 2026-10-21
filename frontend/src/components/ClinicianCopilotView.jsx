@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { synthesizeSoapNote } from '../utils/telemetryMath';
 import { ClinicalAuditService } from '../services/clinicalAuditService';
 import { crosswalkRiskToPsychometrics } from '../data/datasets';
-import { getHumanStatus, getHumanObservations, CLINICAL_DISCLAIMER } from '../utils/terminology';
+import { getHumanStatus, CLINICAL_DISCLAIMER } from '../utils/terminology';
 
 export default function ClinicianCopilotView({
   currentRecord = null,
@@ -42,7 +42,6 @@ export default function ClinicianCopilotView({
 
   // SOAP Draft state
   const [draftSoap, setDraftSoap] = useState(null);
-  const [isEditingDraft, setIsEditingDraft] = useState(false);
   const [isNoteFinalized, setIsNoteFinalized] = useState(false);
 
   // Editable draft fields

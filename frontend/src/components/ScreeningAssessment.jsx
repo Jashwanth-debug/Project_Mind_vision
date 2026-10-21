@@ -10,6 +10,7 @@ import {
 } from '../utils/conversationEngine';
 import {
   analyzeLinguisticStress,
+  analyzeDomainResponses,
   calculateTelemetryMetrics,
   generateClinicalNarrative,
   synthesizeSoapNote,
@@ -223,7 +224,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
 
     TTSService.speak(
       textToSpeak,
-      { rate: 0.92, pitch: '0%', style: 'chat' },
+      { rate: 0.94, pitch: '0%', style: 'chat' },
       {
         onLoading: (loading) => {
           setIsTtsLoading(loading);
@@ -831,7 +832,7 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
 
     TTSService.speak(
       "Thank you for taking this quiet moment for yourself. Preparing your gentle reflection summary now.",
-      { rate: 0.92, pitch: '0%', style: 'chat' }
+      { rate: 0.94, pitch: '0%', style: 'chat' }
     );
 
     setTimeout(() => {
@@ -841,9 +842,24 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
         .filter((a) => Boolean(a));
       const fullValidText = validAnswers.join(' ');
       const isTextValid = validAnswers.length > 0;
-      const sentiment = analyzeLinguisticStress(fullValidText);
+      
+      // 2. Perform deep clinical domain analysis across Mood, Sleep, Stress, Energy, and Coping
+      const domainAnalysis = analyzeDomainResponses(history);
 
-      // 2. Compute true session average of active facial AU scores
+      // 3. Compute blended linguistic stress: holistic semantic stress + domain stress peak
+      const holisticSentiment = analyzeLinguisticStress(fullValidText);
+      const domainValues = Object.values(domainAnalysis.domainScores || {});
+      const maxDomainStress = domainValues.length > 0 ? Math.max(...domainValues) : 0.20;
+      const avgDomainStress = domainValues.length > 0
+        ? (domainValues.reduce((a, b) => a + b, 0) / domainValues.length)
+        : 0.20;
+
+      // Calibrated sentiment combining full transcript context with domain-specific expressions
+      const sentiment = parseFloat(
+        Math.min(0.98, Math.max(0.05, (holisticSentiment * 0.50) + (maxDomainStress * 0.30) + (avgDomainStress * 0.20))).toFixed(2)
+      );
+
+      // 4. Compute true session average of active facial AU scores
       const hasFacial = sessionAu4SamplesRef.current.length >= 5;
       const sessionAvgAu4 = hasFacial
         ? parseFloat((sessionAu4SamplesRef.current.reduce((a, b) => a + b, 0) / sessionAu4SamplesRef.current.length).toFixed(2))
@@ -852,13 +868,13 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
         ? parseFloat((sessionAu15SamplesRef.current.reduce((a, b) => a + b, 0) / sessionAu15SamplesRef.current.length).toFixed(2))
         : null;
 
-      // 3. Compute true session average of audio prosody jitter
+      // 5. Compute true session average of audio prosody jitter
       const hasAudio = sessionJitterSamplesRef.current.length >= 5;
       const sessionAvgJitter = hasAudio
         ? parseFloat((sessionJitterSamplesRef.current.reduce((a, b) => a + b, 0) / sessionJitterSamplesRef.current.length).toFixed(2))
         : null;
 
-      // 4. Compute composite risk & decision support strictly from valid signals with adaptive weighting
+      // 6. Compute composite risk & decision support strictly from valid signals with adaptive weighting
       const metrics = calculateTelemetryMetrics(
         sessionAvgAu4,
         sessionAvgAu15,
@@ -870,11 +886,11 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       const clinicalNarrative = generateClinicalNarrative(metrics);
       const soapNote = synthesizeSoapNote(fullValidText || history.map((h) => h.answer).join(' '), metrics);
 
-      const isElevatedRisk = metrics.riskLevel === 'ELEVATED' || metrics.riskLevel === 'SEVERE' || (metrics.compositeRisk >= 5.0);
-      const reportHeadline = isElevatedRisk ? "It might help to talk with someone" : "Steady & calm pattern reported";
-      const reportExplanation = isElevatedRisk
+      const isElevatedRisk = metrics.riskLevel === 'ELEVATED' || metrics.riskLevel === 'SEVERE' || (metrics.compositeRisk >= 3.5);
+      const reportHeadline = domainAnalysis.headline || (isElevatedRisk ? "It might help to talk with someone" : "Steady & calm pattern reported");
+      const reportExplanation = domainAnalysis.explanation || (isElevatedRisk
         ? "We noticed subtle signs of stress in your responses today. Remember that carrying a lot is hard, and gentle support is always available."
-        : "Your self-reported answers and estimated signals reflect a calm, steady pattern today. Nice job taking time out of your day to pause and check in with yourself.";
+        : "Your self-reported answers and estimated signals reflect a calm, steady pattern today. Nice job taking time out of your day to pause and check in with yourself.");
 
       const reportId = `scr_${Math.random().toString(36).substring(2, 9)}`;
       const finalReport = {
@@ -899,9 +915,17 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
         summary: reportHeadline,
         explanation: reportExplanation,
         cues: {
-          words: fullValidText || (history && history.length > 0 ? history.map((h) => h.answer).join(' ') : 'Shared reflections on daily routine, energy, and sleep.'),
-          speakingRhythm: hasAudio ? 'Steady, calm pacing with natural breathing intervals.' : 'Even conversational pacing observed in reflections.',
-          gentleExpressions: hasFacial ? 'Relaxed facial muscle tone and comfortable focus observed.' : 'Self-guided reflection completed with relaxed focus.'
+          words: domainAnalysis.elevatedDomains && domainAnalysis.elevatedDomains.length > 0
+            ? `Shared reflections highlighting ${domainAnalysis.elevatedDomains.join(', ')}.`
+            : domainAnalysis.strengthDomains && domainAnalysis.strengthDomains.length > 0
+            ? `Shared reflections reflecting steady ${domainAnalysis.strengthDomains.join(', ')}.`
+            : (fullValidText || (history && history.length > 0 ? history.map((h) => h.answer).join(' ') : 'Shared reflections on daily routine, energy, and sleep.')),
+          speakingRhythm: hasAudio
+            ? (metrics.acousticJitter > 0.45 ? 'Elevated vocal micro-tremor with quickened conversational pace.' : 'Steady, calm pacing with natural breathing intervals.')
+            : 'Even conversational pacing observed in reflections.',
+          gentleExpressions: hasFacial
+            ? (metrics.au4 > 0.45 || metrics.au15 > 0.45 ? 'Subtle facial tension observed in brow concentration.' : 'Relaxed facial muscle tone and comfortable focus observed.')
+            : 'Self-guided reflection completed with relaxed focus.'
         }
       };
 
@@ -1687,10 +1711,10 @@ export default function ScreeningAssessment({ onCompleteAssessment, onShowToast 
       {/* ============================================================== */}
       {currentStage === STAGE.RESULTS && completedReport && (() => {
         const isElevated = completedReport.riskLevel === 'ELEVATED' || completedReport.riskLevel === 'SEVERE';
-        const headline = isElevated ? "It might help to talk with someone" : "Steady & calm pattern reported";
-        const explanation = isElevated
+        const headline = completedReport.summary || (isElevated ? "It might help to talk with someone" : "Steady & calm pattern reported");
+        const explanation = completedReport.explanation || (isElevated
           ? "We noticed subtle signs of stress in your responses today. Remember that carrying a lot is hard, and gentle support is always available."
-          : "Your self-reported answers and estimated signals reflect a calm, steady pattern today. Nice job taking time out of your day to pause and check in with yourself.";
+          : "Your self-reported answers and estimated signals reflect a calm, steady pattern today. Nice job taking time out of your day to pause and check in with yourself.");
 
         return (
           <div className="patient-view-shell" style={{ width: '100%' }}>

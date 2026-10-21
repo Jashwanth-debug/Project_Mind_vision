@@ -36,63 +36,153 @@ export class TTSService {
   static isLocalUtteranceActive = false;
 
   /**
-   * Determine best local emergency voice in strict priority sequence
+   * Asynchronously ensure voice list is loaded from window.speechSynthesis
    */
-  static selectBestFallbackVoice() {
+  static async ensureVoicesLoaded(timeoutMs = 600) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
+    
+    if (gCachedFallbackVoices && gCachedFallbackVoices.length > 0) {
+      return gCachedFallbackVoices;
+    }
+
+    const immediate = window.speechSynthesis.getVoices() || [];
+    if (immediate.length > 0) {
+      gCachedFallbackVoices = immediate;
+      return immediate;
+    }
+
+    return new Promise((resolve) => {
+      let resolved = false;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        try {
+          const v = window.speechSynthesis.getVoices() || [];
+          if (v.length > 0) gCachedFallbackVoices = v;
+          resolve(v);
+        } catch {
+          resolve([]);
+        }
+      };
+
+      const originalHandler = window.speechSynthesis.onvoiceschanged;
+      window.speechSynthesis.onvoiceschanged = (e) => {
+        if (typeof originalHandler === 'function') {
+          try { originalHandler(e); } catch {}
+        }
+        finish();
+      };
+
+      setTimeout(finish, timeoutMs);
+    });
+  }
+
+  /**
+   * Determine if a voice is mechanical, vintage robotic, or novelty synthesizer
+   */
+  static isRoboticOrNoveltyVoice(voice) {
+    if (!voice || !voice.name) return true;
+    const n = voice.name.toLowerCase();
+    const blacklist = [
+      'alex', 'fred', 'albert', 'bad news', 'bahh', 'bells', 'boing',
+      'bubbles', 'cellos', 'good news', 'jester', 'junior', 'organ',
+      'ralph', 'superstar', 'trinoids', 'whisper', 'wobble', 'zarvox',
+      'sinister', 'hysterical', 'deranged', 'victor', 'edward'
+    ];
+    return blacklist.some((keyword) => n.includes(keyword));
+  }
+
+  /**
+   * Determine best natural human voice in strict clinical priority sequence
+   */
+  static selectBestFallbackVoice(voiceList = null) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
-    const voices = (gCachedFallbackVoices && gCachedFallbackVoices.length > 0)
-      ? gCachedFallbackVoices
-      : (window.speechSynthesis.getVoices() || []);
+    const voices = (voiceList && voiceList.length > 0)
+      ? voiceList
+      : ((gCachedFallbackVoices && gCachedFallbackVoices.length > 0)
+          ? gCachedFallbackVoices
+          : (window.speechSynthesis.getVoices() || []));
     if (!voices || voices.length === 0) return null;
 
-    const englishVoices = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('en'));
-    const candidatePool = englishVoices.length > 0 ? englishVoices : voices;
+    // Filter to English non-robotic candidates
+    const englishNonRobotic = voices.filter(
+      (v) => v.lang && v.lang.toLowerCase().startsWith('en') && !this.isRoboticOrNoveltyVoice(v)
+    );
+    const candidatePool = englishNonRobotic.length > 0
+      ? englishNonRobotic
+      : voices.filter((v) => !this.isRoboticOrNoveltyVoice(v));
 
-    // Priority 1: Microsoft Aria Online (Natural)
-    const msAria = candidatePool.find((v) => {
+    if (candidatePool.length === 0) {
+      // Fallback only if no non-robotic voice exists at all
+      return voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en')) || voices[0] || null;
+    }
+
+    // Priority 1: High-fidelity Neural / Online voices (e.g., Microsoft Aria/Jenny Natural)
+    const msNatural = candidatePool.find((v) => {
       const n = v.name.toLowerCase();
-      return n.includes('aria online (natural)') ||
-             (n.includes('microsoft') && n.includes('aria') && n.includes('natural')) ||
-             (n.includes('microsoft') && n.includes('aria'));
+      return n.includes('natural') && (n.includes('aria') || n.includes('jenny') || n.includes('guy') || n.includes('microsoft'));
     });
-    if (msAria) return msAria;
+    if (msNatural) return msNatural;
 
-    // Priority 2: Google US English
+    // Priority 2: Google US English (Standard Chrome high-fidelity natural voice - warm & conversational)
     const googleUS = candidatePool.find((v) => {
       const n = v.name.toLowerCase();
-      return n.includes('google us english') || n.includes('google us');
+      return n === 'google us english' || n.includes('google us english');
     });
     if (googleUS) return googleUS;
 
-    // Priority 3: Apple Enhanced/Premium voices
+    // Priority 3: Google UK English Female / Male
+    const googleUKFemale = candidatePool.find((v) => {
+      const n = v.name.toLowerCase();
+      return n.includes('google uk english female') || (n.includes('google') && n.includes('female'));
+    });
+    if (googleUKFemale) return googleUKFemale;
+
+    const googleOther = candidatePool.find((v) => v.name.toLowerCase().includes('google'));
+    if (googleOther) return googleOther;
+
+    // Priority 4: Apple Enhanced / Premium voices (Samantha Enhanced, Ava Enhanced, Serena Enhanced)
     const appleEnhanced = candidatePool.find((v) => {
       const n = v.name.toLowerCase();
-      const isAppleName = n.includes('samantha') || n.includes('karen') || n.includes('victoria') ||
-                          n.includes('ava') || n.includes('serena') || n.includes('allison') ||
-                          n.includes('daniel') || n.includes('oliver');
-      const isPremium = n.includes('enhanced') || n.includes('premium') || n.includes('natural');
-      return isAppleName && isPremium;
+      const isEnhanced = n.includes('enhanced') || n.includes('premium');
+      const isNaturalApple = n.includes('samantha') || n.includes('ava') || n.includes('karen') ||
+                             n.includes('serena') || n.includes('allison') || n.includes('daniel') ||
+                             n.includes('zoe') || n.includes('oliver');
+      return isEnhanced && isNaturalApple;
     });
     if (appleEnhanced) return appleEnhanced;
 
-    // Priority 4: Apple standard
-    const appleStandard = candidatePool.find((v) => {
+    // Priority 5: Apple Standard Natural voices (Samantha, Ava, Karen, Daniel, Serena)
+    const appleNatural = candidatePool.find((v) => {
       const n = v.name.toLowerCase();
-      return n.includes('samantha') || n.includes('karen') || n.includes('victoria') || n.includes('ava');
+      return n.includes('samantha') || n.includes('ava') || n.includes('karen') ||
+             n.includes('daniel') || n.includes('serena') || n.includes('moira') ||
+             n.includes('tessa');
     });
-    if (appleStandard) return appleStandard;
+    if (appleNatural) return appleNatural;
 
-    // Priority 5: Best available fallback
+    // Priority 6: Any generic voice tagged 'natural' or 'neural'
     const genericNatural = candidatePool.find((v) => {
       const n = v.name.toLowerCase();
-      return n.includes('natural') || n.includes('neural') || n.includes('enhanced');
+      return n.includes('natural') || n.includes('neural');
     });
     if (genericNatural) return genericNatural;
 
-    const defaultEn = candidatePool.find((v) => v.default && v.lang && v.lang.toLowerCase().startsWith('en'));
-    if (defaultEn) return defaultEn;
+    // Priority 7: Microsoft standard desktop natural
+    const msDesktop = candidatePool.find((v) => {
+      const n = v.name.toLowerCase();
+      return n.includes('zira') || n.includes('jenny');
+    });
+    if (msDesktop) return msDesktop;
 
-    return candidatePool.find((v) => v.lang && v.lang.toLowerCase().startsWith('en')) || candidatePool[0] || null;
+    // Priority 8: Clean en-US or en-GB candidate
+    const enUsOrGb = candidatePool.find((v) => {
+      const l = (v.lang || '').toLowerCase();
+      return l === 'en-us' || l === 'en-gb';
+    });
+    if (enUsOrGb) return enUsOrGb;
+
+    return candidatePool[0] || null;
   }
 
   /**
@@ -297,11 +387,12 @@ export class TTSService {
   /**
    * Silent emergency fallback to window.speechSynthesis
    * Adheres strictly to requirements:
-   * - Best available local voice (Aria Online -> Google US -> Apple Enhanced -> Fallback)
-   * - rate: 0.92, pitch: 1.0
-   * - window.speechSynthesis.cancel() immediately before speak()
+   * - Awaits voice list initialization to prevent robotic default
+   * - Natural high-fidelity voice selection (Microsoft Natural / Google US / Apple Enhanced)
+   * - Empathetic rate (0.94) and pitch (1.0) with gentle conversational pauses
+   * - Immediate window.speechSynthesis.cancel() before speak()
    */
-  static fallbackToSpeechSynthesis(text, onStart, onFinish) {
+  static async fallbackToSpeechSynthesis(text, onStart, onFinish) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       if (onFinish) onFinish();
       return;
@@ -311,8 +402,14 @@ export class TTSService {
       window.speechSynthesis.cancel();
       this.isLocalUtteranceActive = true;
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      const bestVoice = this.selectBestFallbackVoice();
+      // Ensure voice list is fully initialized
+      const loadedVoices = await this.ensureVoicesLoaded(500);
+      const bestVoice = this.selectBestFallbackVoice(loadedVoices);
+
+      // Add gentle conversational punctuation pauses between sentences if needed
+      const conversationalText = text.replace(/([.?!])\s+/g, '$1  ');
+
+      const utterance = new SpeechSynthesisUtterance(conversationalText);
       if (bestVoice) {
         utterance.voice = bestVoice;
         utterance.lang = bestVoice.lang || 'en-US';
@@ -320,7 +417,8 @@ export class TTSService {
         utterance.lang = 'en-US';
       }
 
-      utterance.rate = 0.92;
+      // Empathetic, human conversational prosody
+      utterance.rate = 0.94;
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
 
@@ -403,4 +501,9 @@ export class TTSService {
     } catch {}
     return { success: false, isConfigured: false, activeProvider: 'fallback' };
   }
+}
+
+// Background pre-warm voice list on client load
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  TTSService.ensureVoicesLoaded(1000).catch(() => {});
 }

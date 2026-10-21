@@ -486,37 +486,63 @@ export const EXPANDED_CLINICAL_LEXICON = {
     'cannot take it', 'can\'t go on', 'unbearable', 'want to die', 'end my life',
     'hopeless', 'kill myself', 'no point living', 'severe agony', 'suicide',
     'better off dead', 'can\'t take this anymore', 'suffering horribly',
-    'despair', 'panic attack', 'complete breakdown', 'shattered', 'agony'
+    'despair', 'panic attack', 'complete breakdown', 'shattered', 'agony',
+    'giving up', 'cannot keep going', 'no reason to live', 'want it all to end',
+    'cannot survive this', 'wish i was dead'
   ],
   severeDepression: [
     'worthless', 'hollow', 'empty inside', 'numb', 'dead inside', 'crying constantly',
     'darkness', 'burden to everyone', 'failed at everything', 'ruined my life',
-    'guilt', 'self-loathing', 'pointless', 'desolate', 'abandoned', 'miserable'
+    'guilt', 'self-loathing', 'pointless', 'desolate', 'abandoned', 'miserable',
+    'depressed', 'depression', 'severe depression', 'deeply sad', 'sadness', 'sad',
+    'down in the dumps', 'feeling down', 'unhappy', 'heartbroken', 'despondent',
+    'demoralized', 'grief', 'crying', 'tears', 'weeping', 'awful', 'terrible',
+    'horrible', 'loss of interest', 'no joy', 'cannot feel anything', 'struggling to care'
   ],
   maskedMinimization: [
     'everything is fine', 'i am completely fine', 'perfectly okay', 'doing great actually',
     'just putting on a smile', 'managing fine', 'nobody knows', 'hiding it',
     'pretending to be happy', 'holding it together', 'trying to look normal',
-    'just tired that\'s all', 'nothing wrong with me', 'smiling on the outside'
+    'just tired that\'s all', 'nothing wrong with me', 'smiling on the outside',
+    'i\'m fine', 'i am fine', 'just dealing with it', 'fake it until i make it'
   ],
   anxietyPanic: [
     'suffocating', 'heart racing', 'pounding chest', 'trembling', 'terrified',
     'dread', 'overwhelmed', 'shaking', 'can\'t breathe', 'paralyzed', 'choking',
-    'dizziness', 'impending doom', 'nervous wreck', 'racing thoughts'
+    'dizziness', 'impending doom', 'nervous wreck', 'racing thoughts',
+    'anxious', 'anxiety', 'severe anxiety', 'stress', 'stressed', 'stressed out',
+    'stressful', 'worried', 'worrying', 'worry', 'panic', 'panicking', 'nervous',
+    'restless', 'on edge', 'tense', 'tension', 'overthinking', 'frightened',
+    'scared', 'freaking out', 'keyed up', 'tight chest', 'hyperventilating'
   ],
   somaticFatigue: [
-    'exhausted', 'drained', 'fatigued', 'leaden limbs', 'insomnia', 'sleepless',
-    'cannot sleep', 'body aches', 'constant tension', 'splitting headache',
-    'burning eyes', 'worn out', 'depleted', 'no energy', 'struggling to get out of bed'
+    'exhausted', 'drained', 'fatigued', 'fatigue', 'leaden limbs', 'insomnia',
+    'sleepless', 'cannot sleep', 'cant sleep', 'unable to sleep', 'poor sleep',
+    'broken sleep', 'trouble sleeping', 'bad sleep', 'waking up constantly',
+    'waking up early', 'restless sleep', 'nightmares', 'body aches', 'constant tension',
+    'splitting headache', 'splitting headaches', 'burning eyes', 'worn out', 'depleted', 'no energy',
+    'struggling to get out of bed', 'tired', 'so tired', 'sleepy', 'burnout',
+    'burned out', 'lethargic', 'sluggish', 'exhaustion', 'run down', 'running on empty',
+    'haven\'t been able to sleep', 'haven\'t slept', 'haven\'t been sleeping',
+    'not able to sleep', 'not sleeping', 'tossing and turning', 'can\'t fall asleep',
+    'trouble falling asleep', 'hard to sleep', 'hard to fall asleep', 'all night'
   ],
   cognitiveDistortion: [
     'never', 'always', 'everyone hates me', 'nobody cares', 'completely impossible',
-    'total disaster', 'doomed', 'catastrophic', 'irreparable', 'useless', 'forever broken'
+    'total disaster', 'doomed', 'catastrophic', 'irreparable', 'useless',
+    'forever broken', 'nobody loves me', 'complete failure', 'nothing works',
+    'ruined everything', 'lonely', 'isolated', 'completely alone', 'nobody understands',
+    'trapped', 'stuck', 'alienated'
   ],
   euthymicResilience: [
     'peaceful', 'hopeful', 'steady', 'calm', 'grateful', 'grounded', 'optimistic',
-    'sleeping well', 'healing', 'making progress', 'feeling better', 'stable',
-    'well-rested', 'supported', 'content', 'happy', 'productive', 'at ease'
+    'sleeping well', 'slept well', 'sound sleep', 'great sleep', 'deep sleep',
+    'healing', 'making progress', 'feeling better', 'stable', 'well-rested',
+    'well rested', 'supported', 'content', 'happy', 'productive', 'at ease',
+    'good', 'feeling good', 'doing good', 'great', 'doing great', 'pretty good',
+    'doing well', 'feeling well', 'energized', 'refreshed', 'relaxed', 'balanced',
+    'healthy', 'coping well', 'manageable', 'in control', 'confident', 'joy',
+    'joyful', 'thriving', 'mindful'
   ],
   adversativeConjunctions: [
     ' but ', ' however ', ' although ', ' though ', ' even though ', ' yet ',
@@ -736,8 +762,19 @@ export function getBenchmarkProfileById(cohortId) {
 }
 
 /**
+ * Helper to determine whether a keyword occurrence in text is preceded by a negation window
+ */
+function isPrecededByNegation(text, matchIndex, windowChars = 32) {
+  if (matchIndex <= 0) return false;
+  const start = Math.max(0, matchIndex - windowChars);
+  const snippet = text.substring(start, matchIndex).toLowerCase();
+  return /\b(not|no|never|hardly|barely|scarcely|cannot|can't|cant|haven't|havent|didn't|didnt|don't|dont|isn't|isnt|aren't|arent|wasn't|wasnt|hard to|difficult to|struggling to|trouble|unable to|lack of|without)\b/i.test(snippet);
+}
+
+/**
  * Enhanced NLP sentiment distress calculation utilizing the expanded clinical lexicon
- * Calculates fine-grained stress score [0.05 to 0.98] with cognitive distortion detection.
+ * Features bidirectional negation handling, cognitive distortion detection, and
+ * clinical affect modulation [0.05 to 0.98].
  */
 export function calculateLexicalStressExtended(text) {
   if (!text || text.trim() === '') return 0.25;
@@ -745,67 +782,235 @@ export function calculateLexicalStressExtended(text) {
   const lower = text.toLowerCase();
   let score = 0.20; // baseline
 
+  // Helper to count valid (unnegated) occurrences of lexicon terms
+  const findHits = (termList, checkNegation = true) => {
+    let hits = 0;
+    for (const term of termList) {
+      let searchIdx = 0;
+      while (searchIdx < lower.length) {
+        const foundIdx = lower.indexOf(term, searchIdx);
+        if (foundIdx === -1) break;
+        
+        // Ensure word boundary check for short words (e.g. 'sad', 'down', 'good')
+        const charBefore = foundIdx > 0 ? lower[foundIdx - 1] : ' ';
+        const charAfter = (foundIdx + term.length < lower.length) ? lower[foundIdx + term.length] : ' ';
+        const isWordBoundary = !/[a-z0-9]/i.test(charBefore) && !/[a-z0-9]/i.test(charAfter);
+
+        if (isWordBoundary) {
+          const negated = checkNegation && isPrecededByNegation(lower, foundIdx);
+          if (!negated) {
+            hits++;
+          }
+        }
+        searchIdx = foundIdx + term.length;
+      }
+    }
+    return hits;
+  };
+
   // 1. Acute crisis triggers (+0.35 each, max +0.50)
-  let crisisHits = 0;
-  for (const word of EXPANDED_CLINICAL_LEXICON.acuteCrisis) {
-    if (lower.includes(word)) crisisHits++;
-  }
+  const crisisHits = findHits(EXPANDED_CLINICAL_LEXICON.acuteCrisis, true);
   if (crisisHits > 0) score += Math.min(0.50, crisisHits * 0.35);
 
-  // 2. Severe depression indicators (+0.18 each)
-  let depHits = 0;
-  for (const word of EXPANDED_CLINICAL_LEXICON.severeDepression) {
-    if (lower.includes(word)) depHits++;
-  }
-  if (depHits > 0) score += Math.min(0.35, depHits * 0.18);
+  // 2. Severe depression indicators (+0.18 each, max +0.38)
+  const depHits = findHits(EXPANDED_CLINICAL_LEXICON.severeDepression, true);
+  if (depHits > 0) score += Math.min(0.38, depHits * 0.18);
 
-  // 3. Anxiety and panic indicators (+0.14 each)
-  let anxHits = 0;
-  for (const word of EXPANDED_CLINICAL_LEXICON.anxietyPanic) {
-    if (lower.includes(word)) anxHits++;
-  }
-  if (anxHits > 0) score += Math.min(0.28, anxHits * 0.14);
+  // 3. Anxiety and panic indicators (+0.14 each, max +0.32)
+  const anxHits = findHits(EXPANDED_CLINICAL_LEXICON.anxietyPanic, true);
+  if (anxHits > 0) score += Math.min(0.32, anxHits * 0.14);
 
-  // 4. Somatic exhaustion indicators (+0.10 each)
-  let somHits = 0;
-  for (const word of EXPANDED_CLINICAL_LEXICON.somaticFatigue) {
-    if (lower.includes(word)) somHits++;
-  }
-  if (somHits > 0) score += Math.min(0.22, somHits * 0.10);
+  // 4. Somatic exhaustion indicators (+0.10 each, max +0.25)
+  const somHits = findHits(EXPANDED_CLINICAL_LEXICON.somaticFatigue, true);
+  if (somHits > 0) score += Math.min(0.25, somHits * 0.10);
 
-  // 5. Cognitive distortion markers (+0.08 each)
-  let distHits = 0;
-  for (const word of EXPANDED_CLINICAL_LEXICON.cognitiveDistortion) {
-    if (lower.includes(word)) distHits++;
-  }
-  if (distHits > 0) score += Math.min(0.16, distHits * 0.08);
+  // 5. Cognitive distortion markers (+0.08 each, max +0.18)
+  const distHits = findHits(EXPANDED_CLINICAL_LEXICON.cognitiveDistortion, true);
+  if (distHits > 0) score += Math.min(0.18, distHits * 0.08);
 
-  // 6. Masked minimization / suppression markers (+0.12 when paired with fatigue)
+  // 6. Masked minimization / suppression markers (+0.12 when paired with fatigue/anxiety)
   let maskHits = 0;
-  for (const word of EXPANDED_CLINICAL_LEXICON.maskedMinimization) {
-    if (lower.includes(word)) maskHits++;
+  for (const phrase of EXPANDED_CLINICAL_LEXICON.maskedMinimization) {
+    if (lower.includes(phrase)) maskHits++;
   }
   if (maskHits > 0) {
-    // If the patient is stating "fine/pretending" but also has fatigue or anxiety words
     score += (somHits > 0 || anxHits > 0 || depHits > 0) ? 0.18 : 0.06;
   }
 
-  // 7. Euthymic resilience buffers (-0.12 each)
-  let resHits = 0;
-  for (const word of EXPANDED_CLINICAL_LEXICON.euthymicResilience) {
-    if (lower.includes(word)) resHits++;
+  // 7. Euthymic resilience buffers (-0.12 each) & Inverted resilience ("not good", "not sleeping well" -> +0.16)
+  let genuineResHits = 0;
+  let invertedResHits = 0;
+
+  for (const term of EXPANDED_CLINICAL_LEXICON.euthymicResilience) {
+    let searchIdx = 0;
+    while (searchIdx < lower.length) {
+      const foundIdx = lower.indexOf(term, searchIdx);
+      if (foundIdx === -1) break;
+
+      const charBefore = foundIdx > 0 ? lower[foundIdx - 1] : ' ';
+      const charAfter = (foundIdx + term.length < lower.length) ? lower[foundIdx + term.length] : ' ';
+      const isWordBoundary = !/[a-z0-9]/i.test(charBefore) && !/[a-z0-9]/i.test(charAfter);
+
+      if (isWordBoundary) {
+        if (isPrecededByNegation(lower, foundIdx)) {
+          // Negated resilience: "not sleeping well", "not feeling good", "cannot relax"
+          invertedResHits++;
+        } else {
+          // Genuine resilience: "sleeping well", "feeling great"
+          genuineResHits++;
+        }
+      }
+      searchIdx = foundIdx + term.length;
+    }
   }
-  if (resHits > 0) score -= Math.min(0.25, resHits * 0.12);
+
+  // Add distress for inverted resilience (e.g. "not feeling well", "not good")
+  if (invertedResHits > 0) {
+    score += Math.min(0.32, invertedResHits * 0.16);
+  }
+
+  // Subtract distress for genuine resilience
+  if (genuineResHits > 0) {
+    score -= Math.min(0.30, genuineResHits * 0.12);
+  }
 
   // 8. Adversative conjunction detection ("but", "however", "although") indicating conflict
   for (const conj of EXPANDED_CLINICAL_LEXICON.adversativeConjunctions) {
     if (lower.includes(conj)) {
-      score += 0.06;
+      score += 0.05;
       break;
     }
   }
 
   return Math.min(Math.max(parseFloat(score.toFixed(2)), 0.05), 0.98);
+}
+
+/**
+ * Analyzes dialogue history by clinical domain (Mood, Sleep, Stress, Energy, Coping)
+ * Returns fine-grained domain scores, elevated/strength domains, and clinically tailored headlines
+ */
+export function analyzeDomainResponses(dialogHistory = []) {
+  if (!Array.isArray(dialogHistory) || dialogHistory.length === 0) {
+    return {
+      domainScores: { mood: 0.20, sleep: 0.20, stress: 0.20, energy: 0.20, coping: 0.20 },
+      elevatedDomains: [],
+      strengthDomains: [],
+      headline: "Steady & calm pattern reported",
+      explanation: "Your self-reported answers and estimated signals reflect a calm, steady pattern today. Nice job taking time out of your day to pause and check in with yourself."
+    };
+  }
+
+  const domainAnswers = {
+    mood: [],
+    sleep: [],
+    stress: [],
+    energy: [],
+    coping: []
+  };
+
+  for (const item of dialogHistory) {
+    const rawAnswer = item.answer || '';
+    const cleanAnswer = typeof rawAnswer === 'string' ? rawAnswer.trim() : '';
+    if (!cleanAnswer) continue;
+
+    // Filter skip statements
+    const low = cleanAnswer.toLowerCase();
+    if (low.includes('skip') || low.includes('proceed to next') || low === 'none' || low.length < 2) continue;
+
+    let theme = (item.theme || '').toLowerCase();
+    if (!theme || !domainAnswers[theme]) {
+      const qContext = ((item.prompt || '') + ' ' + (item.questionId || '')).toLowerCase();
+      if (qContext.includes('sleep') || qContext.includes('rest') || qContext.includes('morning') || qContext.includes('night') || qContext.includes('drift')) {
+        theme = 'sleep';
+      } else if (qContext.includes('stress') || qContext.includes('overwhelm') || qContext.includes('tension') || qContext.includes('pressure') || qContext.includes('weight')) {
+        theme = 'stress';
+      } else if (qContext.includes('energy') || qContext.includes('fatigue') || qContext.includes('deplet') || qContext.includes('stamina') || qContext.includes('exhaust')) {
+        theme = 'energy';
+      } else if (qContext.includes('coping') || qContext.includes('ground') || qContext.includes('support') || qContext.includes('connect') || qContext.includes('friend') || qContext.includes('pause')) {
+        theme = 'coping';
+      } else {
+        theme = 'mood';
+      }
+    }
+
+    if (domainAnswers[theme]) {
+      domainAnswers[theme].push(cleanAnswer);
+    } else {
+      domainAnswers.mood.push(cleanAnswer);
+    }
+  }
+
+  const moodScore = domainAnswers.mood.length > 0 ? calculateLexicalStressExtended(domainAnswers.mood.join('. ')) : 0.20;
+  const sleepScore = domainAnswers.sleep.length > 0 ? calculateLexicalStressExtended(domainAnswers.sleep.join('. ')) : 0.20;
+  const stressScore = domainAnswers.stress.length > 0 ? calculateLexicalStressExtended(domainAnswers.stress.join('. ')) : 0.20;
+  const energyScore = domainAnswers.energy.length > 0 ? calculateLexicalStressExtended(domainAnswers.energy.join('. ')) : 0.20;
+  const copingScore = domainAnswers.coping.length > 0 ? calculateLexicalStressExtended(domainAnswers.coping.join('. ')) : 0.20;
+
+  const elevatedDomains = [];
+  const strengthDomains = [];
+
+  if (sleepScore >= 0.30) elevatedDomains.push('Sleep Quality');
+  else if (sleepScore <= 0.22 && domainAnswers.sleep.length > 0) strengthDomains.push('Restful Sleep');
+
+  if (moodScore >= 0.30) elevatedDomains.push('Emotional Mood');
+  else if (moodScore <= 0.22 && domainAnswers.mood.length > 0) strengthDomains.push('Emotional Balance');
+
+  if (stressScore >= 0.30) elevatedDomains.push('Daily Stress');
+  else if (stressScore <= 0.22 && domainAnswers.stress.length > 0) strengthDomains.push('Stress Management');
+
+  if (energyScore >= 0.30) elevatedDomains.push('Physical Stamina & Fatigue');
+  else if (energyScore <= 0.22 && domainAnswers.energy.length > 0) strengthDomains.push('Vital Energy');
+
+  if (copingScore <= 0.25 && domainAnswers.coping.length > 0) strengthDomains.push('Resilience & Coping');
+  else if (copingScore >= 0.35) elevatedDomains.push('Social Isolation');
+
+  // Build clinical headline and tailored explanation
+  let headline = "Steady & calm pattern reported";
+  let explanation = "Your self-reported answers reflect a calm, steady rhythm today. Nice job taking time out of your day to pause and check in with yourself.";
+
+  const isSignificantlyElevated = elevatedDomains.length >= 2 || moodScore >= 0.50 || stressScore >= 0.50 || sleepScore >= 0.50;
+
+  if (isSignificantlyElevated) {
+    if (elevatedDomains.includes('Sleep Quality') && elevatedDomains.includes('Daily Stress')) {
+      headline = "Noticeable stress & sleep disruption reported";
+      explanation = "Your responses indicate heightened daily tension paired with interrupted sleep. Taking dedicated moments to unwind and sharing the load with someone you trust can help restore balance.";
+    } else if (elevatedDomains.includes('Emotional Mood') && elevatedDomains.includes('Physical Stamina & Fatigue')) {
+      headline = "Low mood & physical exhaustion observed";
+      explanation = "We noticed cues of low mood and drained stamina in your reflections today. Carrying emotional weight takes a real toll on your body; caring support is always available.";
+    } else if (elevatedDomains.includes('Emotional Mood')) {
+      headline = "Noticeable emotional weight & low mood reported";
+      explanation = "Your reflections suggest you've been carrying a heavy emotional headspace recently. Remember that you don't have to navigate this alone — talking with a counselor can offer gentle clarity.";
+    } else if (elevatedDomains.includes('Daily Stress')) {
+      headline = "Elevated daily tension & situational stress";
+      explanation = "We noticed signs of heightened situational pressure in your responses. Prioritizing small grounding breaks and setting healthy boundaries can help ease the strain.";
+    } else if (elevatedDomains.includes('Sleep Quality')) {
+      headline = "Noticeable sleep disruption reported";
+      explanation = "Your reflections indicate trouble getting restful, uninterrupted sleep. Calming evening routines and protected wind-down time can help support recovery.";
+    } else {
+      headline = "It might help to talk with someone";
+      explanation = "We noticed signs of stress and fatigue in your reflections today. Remember that carrying a lot is hard, and gentle, non-judgmental support is always available.";
+    }
+  } else if (elevatedDomains.length === 1) {
+    headline = `Mild tension observed in ${elevatedDomains[0].toLowerCase()}`;
+    explanation = `While most areas reflect steady balance, your reflections showed mild strain in ${elevatedDomains[0].toLowerCase()}. Taking gentle care of yourself in this area can keep things manageable.`;
+  } else if (strengthDomains.length >= 2) {
+    headline = "Steady, calm & well-balanced pattern";
+    explanation = "Your reflections show healthy emotional equilibrium, steady restfulness, and positive coping strengths today. Taking regular moments to pause helps sustain this balance.";
+  }
+
+  return {
+    domainScores: {
+      mood: moodScore,
+      sleep: sleepScore,
+      stress: stressScore,
+      energy: energyScore,
+      coping: copingScore
+    },
+    elevatedDomains,
+    strengthDomains,
+    headline,
+    explanation
+  };
 }
 
 /**

@@ -1,8 +1,11 @@
 import {
   calculateLexicalStressExtended,
+  analyzeDomainResponses,
   crosswalkRiskToPsychometrics,
   NORMATIVE_CALIBRATION_DATA
 } from '../data/datasets';
+
+export { analyzeDomainResponses };
 
 // Sanitize transcript: filter out garbage placeholders, repetitive acoustic noise, skip phrases, or empty strings
 export function sanitizeTranscript(text) {
@@ -64,11 +67,12 @@ export function calculateTelemetryMetrics(au4, au15, acousticJitter, textSentime
   const safeSentiment = Math.max(0, Math.min(1, parseFloat(textSentiment) || 0.15));
 
   // Adaptive channel weights based on active, validated modalities (Base sum = 10.0)
+  // Ensures patient's verbal disclosure receives full clinical diagnostic weighting (40%)
   const baseWeights = {
-    au4: hasFacial ? 3.0 : 0,
-    au15: hasFacial ? 2.5 : 0,
-    jitter: hasAudio ? 2.5 : 0,
-    text: isTextValid ? (hasFacial && hasAudio ? 2.0 : !hasFacial && !hasAudio ? 10.0 : 4.5) : 1.0
+    au4: hasFacial ? 2.2 : 0,
+    au15: hasFacial ? 1.8 : 0,
+    jitter: hasAudio ? 2.0 : 0,
+    text: isTextValid ? (hasFacial && hasAudio ? 4.0 : !hasFacial && !hasAudio ? 10.0 : 5.5) : 1.0
   };
 
   const totalBase = baseWeights.au4 + baseWeights.au15 + baseWeights.jitter + baseWeights.text;
@@ -79,12 +83,10 @@ export function calculateTelemetryMetrics(au4, au15, acousticJitter, textSentime
   const jitterWeight = baseWeights.jitter * scale;
   const textWeight = baseWeights.text * scale;
 
-  const rawRisk = (safeAu4 * au4Weight) +
-                  (safeAu15 * au15Weight) +
-                  (safeJitter * jitterWeight) +
-                  (safeSentiment * textWeight);
-
-  const compositeRisk = Math.min(10.0, Math.max(0.0, parseFloat(rawRisk.toFixed(1))));
+  let rawRisk = (safeAu4 * au4Weight) +
+                (safeAu15 * au15Weight) +
+                (safeJitter * jitterWeight) +
+                (safeSentiment * textWeight);
 
   // Physical non-verbal stress: mean of valid physical signals
   const physicalComponents = [];
@@ -94,6 +96,28 @@ export function calculateTelemetryMetrics(au4, au15, acousticJitter, textSentime
   const physicalStress = physicalComponents.length > 0
     ? physicalComponents.reduce((acc, val) => acc + val, 0) / physicalComponents.length
     : safeSentiment;
+
+  // Clinical safety calibrations:
+  // 1. High self-reported verbal distress (>= 0.65) must not be suppressed to minimal by resting camera face
+  if (safeSentiment >= 0.70) {
+    rawRisk = Math.max(rawRisk, 7.0 * safeSentiment);
+  } else if (safeSentiment >= 0.45) {
+    rawRisk = Math.max(rawRisk, 5.0 * safeSentiment);
+  }
+
+  // 2. Affect Masking (Smiling Depression) check:
+  // Patient verbalizes minimal distress (sentiment <= 0.30) but displays severe physical non-verbal stress (>= 0.65)
+  if (safeSentiment <= 0.30 && physicalStress >= 0.65) {
+    rawRisk = Math.max(rawRisk, physicalStress * 8.0);
+  }
+
+  // 3. Healthy Euthymia check:
+  // If verbal report is clean/resilient (sentiment <= 0.20) and physical stress is at normal resting levels (<= 0.40)
+  if (safeSentiment <= 0.20 && physicalStress <= 0.40) {
+    rawRisk = Math.min(rawRisk, 3.2);
+  }
+
+  const compositeRisk = Math.min(10.0, Math.max(0.0, parseFloat(rawRisk.toFixed(1))));
 
   // Incongruence Index: mathematical difference between physical non-verbal stress and verbal sentiment stress
   const rawIncongruence = Math.abs(physicalStress - safeSentiment);
